@@ -1,3 +1,4 @@
+import CoreImage.CIFilterBuiltins
 import SwiftUI
 
 struct RootView: View {
@@ -271,6 +272,7 @@ struct VotingRoomView: View {
                     ShareLink(item: "打开 WhatToEatTonight，加入房间 \(room.code)") { Label("邀请", systemImage: "square.and.arrow.up") }
                 }
                 Text(room.status).font(.footnote).foregroundStyle(.secondary)
+                QRCodeView(value: room.code).frame(maxWidth: .infinity).listRowBackground(Color.clear)
             }
 
             if !room.matches.isEmpty {
@@ -278,6 +280,10 @@ struct VotingRoomView: View {
                     ForEach(room.matches) { recipe in
                         NavigationLink(value: recipe) { Label("\(recipe.emoji) \(recipe.name)", systemImage: "heart.fill").foregroundStyle(.pink) }
                     }
+                }
+            } else if let fallback = room.bestFallback {
+                Section("当前最受欢迎") {
+                    NavigationLink(value: fallback) { Text("\(fallback.emoji) \(fallback.name)") }
                 }
             }
 
@@ -299,5 +305,23 @@ struct VotingRoomView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: Recipe.self) { RecipeDetailView(recipe: $0) }
         .onDisappear { room.stop() }
+    }
+}
+
+private struct QRCodeView: View {
+    let value: String
+
+    var body: some View {
+        if let image = image {
+            Image(uiImage: image).interpolation(.none).resizable().scaledToFit().frame(width: 150, height: 150)
+                .accessibilityLabel("房间码二维码 \(value)")
+        }
+    }
+
+    private var image: UIImage? {
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(value.utf8)
+        guard let output = filter.outputImage else { return nil }
+        return UIImage(ciImage: output.transformed(by: .init(scaleX: 8, y: 8)))
     }
 }

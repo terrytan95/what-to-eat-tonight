@@ -8,6 +8,10 @@ struct Recipe: Identifiable, Hashable, Codable {
     let minutes: Int
     let diets: Set<Diet>
     let steps: [String]
+
+    func isEligible(maximumMinutes: Int, diets requiredDiets: Set<Diet>, excluding excludedIDs: Set<String> = []) -> Bool {
+        !excludedIDs.contains(id) && minutes <= maximumMinutes && requiredDiets.isSubset(of: diets)
+    }
 }
 
 enum Diet: String, CaseIterable, Codable, Identifiable {
@@ -66,11 +70,11 @@ enum DinnerDecider {
         let choices = switch mode {
         case .cook:
             RecipeCatalog.recipes
-                .filter { $0.minutes <= maximumMinutes && diets.isSubset(of: $0.diets) }
+                .filter { $0.isEligible(maximumMinutes: maximumMinutes, diets: diets, excluding: excluding) }
                 .map { DinnerChoice(id: $0.id, name: $0.name, emoji: $0.emoji, reason: "约 \($0.minutes) 分钟就能上桌") }
         case .eatOut:
             diningCategories
         }
-        return choices.filter { !excluding.contains($0.id) }
+        return mode == .cook ? choices : choices.filter { !excluding.contains($0.id) }
     }
 }

@@ -15,6 +15,7 @@ final class NearbyRoom: NSObject {
     nonisolated(unsafe) private var session: MCSession?
     private var advertiser: MCNearbyServiceAdvertiser?
     private var browser: MCNearbyServiceBrowser?
+    private var expiryTask: Task<Void, Never>?
 
     var code = ""
     var status = "尚未加入房间"
@@ -28,6 +29,13 @@ final class NearbyRoom: NSObject {
         return RecipeCatalog.recipes.filter { recipe in votes.values.allSatisfy { $0.likedRecipeIDs.contains(recipe.id) } }
     }
 
+    var bestFallback: Recipe? {
+        guard matches.isEmpty, votes.count > 1 else { return nil }
+        return RecipeCatalog.recipes.max { lhs, rhs in
+            votes.values.count { $0.likedRecipeIDs.contains(lhs.id) } < votes.values.count { $0.likedRecipeIDs.contains(rhs.id) }
+        }
+    }
+
     func create() {
         stop()
         code = String(format: "%06d", Int.random(in: 0...999_999))
@@ -37,6 +45,12 @@ final class NearbyRoom: NSObject {
         advertiser?.startAdvertisingPeer()
         status = "房间已创建，等待对方加入"
         ensureLocalVote()
+        expiryTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(900))
+            guard !Task.isCancelled else { return }
+            self?.status = "房间已过期"
+            self?.stop()
+        }
     }
 
     func join(code rawCode: String) {
@@ -68,6 +82,8 @@ final class NearbyRoom: NSObject {
         browser = nil
         session = nil
         votes = [:]
+        expiryTask?.cancel()
+        expiryTask = nil
     }
 
     private func startSession() {
@@ -128,6 +144,7 @@ extension NearbyRoom: MCSessionDelegate {
             @unknown default: "连接状态未知"
             }
             if state == .connected { sendLocalVote() }
+            if state == .notConnected { votes.removeValue(forKey: peerID.displayName) }
         }
     }
 

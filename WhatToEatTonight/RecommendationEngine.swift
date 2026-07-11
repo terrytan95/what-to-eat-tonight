@@ -7,11 +7,13 @@ enum RecommendationEngine {
         diets: Set<Diet>,
         excluding excludedIDs: Set<String> = []
     ) -> [Recommendation] {
-        RecipeCatalog.recipes
-            .filter { !excludedIDs.contains($0.id) && $0.minutes <= maximumMinutes && diets.isSubset(of: $0.diets) }
+        let aliases = ["西红柿": "番茄", "洋芋": "土豆", "马铃薯": "土豆", "大虾": "虾"]
+        let normalizedIngredients = Set(ingredients.map { aliases[$0] ?? $0 })
+        return RecipeCatalog.recipes
+            .filter { $0.isEligible(maximumMinutes: maximumMinutes, diets: diets, excluding: excludedIDs) }
             .map { recipe in
-                let available = recipe.ingredients.filter(ingredients.contains)
-                let missing = recipe.ingredients.filter { !ingredients.contains($0) }
+                let available = recipe.ingredients.filter(normalizedIngredients.contains)
+                let missing = recipe.ingredients.filter { !normalizedIngredients.contains($0) }
                 let coverage = Double(available.count) / Double(recipe.ingredients.count)
                 return Recommendation(recipe: recipe, available: available, missing: missing, score: coverage - Double(missing.count) * 0.05)
             }

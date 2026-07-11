@@ -19,4 +19,10 @@ struct RecommendationEngineTests {
         #expect(choices.allSatisfy { $0.id != "tomato-eggs" })
         #expect(choices.contains { $0.id == "cheese-toast" })
     }
+
+    @Test func recognizesCommonIngredientAliases() {
+        let results = RecommendationEngine.recommendations(ingredients: ["西红柿", "鸡蛋"], maximumMinutes: 20, diets: [])
+        #expect(results.first?.recipe.id == "tomato-eggs")
+        #expect(results.first?.missing.isEmpty == true)
+    }
 }
