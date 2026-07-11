@@ -4,6 +4,7 @@ import SwiftUI
 struct RootView: View {
     #if DEBUG
     private var demoScreen: DemoScreen? {
+        if let value = ProcessInfo.processInfo.environment["DEMO_SCREEN"] { return DemoScreen(rawValue: value) }
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "-demoScreen"), arguments.indices.contains(index + 1) else { return nil }
         return DemoScreen(rawValue: arguments[index + 1])
@@ -391,11 +392,12 @@ private struct DemoScreenView: View {
 
     init(screen: DemoScreen) {
         self.screen = screen
-        _selectedTab = State(initialValue: switch screen {
+        let tab = switch screen {
         case .pantry, .results, .detail: 0
         case .decide: 1
         case .together, .voting, .match: 2
-        })
+        }
+        _selectedTab = State(initialValue: tab)
     }
 
     var body: some View {
