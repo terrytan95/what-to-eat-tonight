@@ -207,5 +207,97 @@ struct DecideView: View {
 }
 
 struct TogetherView: View {
-    var body: some View { ContentUnavailableView("下一阶段", systemImage: "person.2", description: Text("共同决定功能正在准备。")) }
+    @State private var room = NearbyRoom()
+    @State private var enteredCode = ""
+    @State private var showVoting = false
+
+    var body: some View {
+        VStack(spacing: 24) {
+            VStack(spacing: 8) {
+                Text("两个人，都满意").font(.largeTitle.bold()).multilineTextAlignment(.center)
+                Text("在同一网络附近，输入房间码即可一起选。无需注册。")
+                    .foregroundStyle(.secondary).multilineTextAlignment(.center)
+            }
+
+            Button {
+                room.create()
+                showVoting = true
+            } label: {
+                Label("创建房间", systemImage: "plus.circle.fill").frame(maxWidth: .infinity).padding(.vertical, 8)
+            }
+            .buttonStyle(.borderedProminent).controlSize(.large)
+
+            HStack {
+                Divider()
+                Text("或者加入").font(.caption).foregroundStyle(.secondary)
+                Divider()
+            }
+
+            TextField("六位房间码", text: $enteredCode)
+                .keyboardType(.numberPad)
+                .textContentType(.oneTimeCode)
+                .multilineTextAlignment(.center)
+                .font(.title2.monospacedDigit())
+                .textFieldStyle(.roundedBorder)
+                .onChange(of: enteredCode) { enteredCode = String(enteredCode.filter(\.isNumber).prefix(6)) }
+
+            Button("加入房间") {
+                room.join(code: enteredCode)
+                if room.code.count == 6 { showVoting = true }
+            }
+            .buttonStyle(.bordered)
+            .disabled(enteredCode.count != 6)
+            Spacer()
+        }
+        .padding()
+        .navigationTitle("一起选")
+        .navigationDestination(isPresented: $showVoting) { VotingRoomView(room: room) }
+        .onDisappear { if !showVoting { room.stop() } }
+    }
+}
+
+struct VotingRoomView: View {
+    @Bindable var room: NearbyRoom
+
+    var body: some View {
+        List {
+            Section {
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text("房间码").font(.caption).foregroundStyle(.secondary)
+                        Text(room.code).font(.title.monospacedDigit().bold()).textSelection(.enabled)
+                    }
+                    Spacer()
+                    ShareLink(item: "打开 WhatToEatTonight，加入房间 \(room.code)") { Label("邀请", systemImage: "square.and.arrow.up") }
+                }
+                Text(room.status).font(.footnote).foregroundStyle(.secondary)
+            }
+
+            if !room.matches.isEmpty {
+                Section("共同喜欢") {
+                    ForEach(room.matches) { recipe in
+                        NavigationLink(value: recipe) { Label("\(recipe.emoji) \(recipe.name)", systemImage: "heart.fill").foregroundStyle(.pink) }
+                    }
+                }
+            }
+
+            Section("喜欢就点一下") {
+                ForEach(RecipeCatalog.recipes) { recipe in
+                    let liked = room.votes[room.localParticipant]?.likedRecipeIDs.contains(recipe.id) == true
+                    Button { room.toggleLike(recipe.id) } label: {
+                        HStack {
+                            Text("\(recipe.emoji) \(recipe.name)").foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: liked ? "heart.fill" : "heart").foregroundStyle(liked ? .pink : .secondary)
+                        }
+                    }
+                    .accessibilityValue(liked ? "已喜欢" : "未选择")
+                }
+            }
+        }
+        .navigationTitle("共同决定")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(for: Recipe.self) { RecipeDetailView(recipe: $0) }
+        .onDisappear { room.stop() }
+    }
 }
