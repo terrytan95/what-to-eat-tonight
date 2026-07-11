@@ -13,4 +13,10 @@ struct RecommendationEngineTests {
         #expect(results.allSatisfy { $0.recipe.minutes <= 20 && $0.recipe.diets.contains(.vegetarian) })
         #expect(!results.contains { $0.recipe.id == "tomato-eggs" })
     }
+
+    @Test func dinnerDeciderReusesFiltersAndHonorsExclusions() {
+        let choices = DinnerDecider.choices(mode: .cook, maximumMinutes: 15, diets: [.vegetarian], excluding: ["tomato-eggs"])
+        #expect(choices.allSatisfy { $0.id != "tomato-eggs" })
+        #expect(choices.contains { $0.id == "cheese-toast" })
+    }
 }

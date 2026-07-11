@@ -144,7 +144,66 @@ struct RecipeDetailView: View {
 }
 
 struct DecideView: View {
-    var body: some View { ContentUnavailableView("下一阶段", systemImage: "sparkles", description: Text("一键决定功能正在准备。")) }
+    @Environment(AppState.self) private var state
+    @State private var mode: DinnerMode = .cook
+    @State private var current: DinnerChoice?
+    @State private var remaining: [DinnerChoice] = []
+
+    var body: some View {
+        VStack(spacing: 28) {
+            VStack(spacing: 8) {
+                Text("别想了，就吃这个").font(.largeTitle.bold()).multilineTextAlignment(.center)
+                Text("先做决定，想换再换。").foregroundStyle(.secondary)
+            }
+            Picker("用餐方式", selection: $mode) {
+                ForEach(DinnerMode.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: mode) { reset() }
+
+            if let current {
+                VStack(spacing: 14) {
+                    Text(current.emoji).font(.system(size: 82))
+                    Text(current.name).font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    Text(current.reason).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity, minHeight: 260)
+                .padding()
+                .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 28))
+
+                Button("就吃这个") { state.choose(current.id) }
+                    .buttonStyle(.borderedProminent).controlSize(.large)
+                Button("换一个") { pickNext() }.disabled(remaining.isEmpty)
+                Button("以后少推荐这个", role: .destructive) {
+                    state.dislike(current.id)
+                    pickNext()
+                }
+            } else {
+                ContentUnavailableView("准备好了吗？", systemImage: "sparkles", description: Text("点一下，今晚的选择就交给我。"))
+                Button("帮我决定") { reset(); pickNext() }
+                    .buttonStyle(.borderedProminent).controlSize(.large)
+            }
+            Spacer()
+        }
+        .padding()
+        .navigationTitle("快速决定")
+        .onChange(of: state.maximumMinutes) { reset() }
+    }
+
+    private func reset() {
+        current = nil
+        remaining = DinnerDecider.choices(mode: mode, maximumMinutes: state.maximumMinutes, diets: state.diets, excluding: state.disliked)
+            .sorted { lhs, rhs in
+                let leftRecent = state.recentChoices.firstIndex(of: lhs.id) ?? .max
+                let rightRecent = state.recentChoices.firstIndex(of: rhs.id) ?? .max
+                return leftRecent > rightRecent
+            }
+    }
+
+    private func pickNext() {
+        if remaining.isEmpty { reset() }
+        current = remaining.isEmpty ? nil : remaining.removeFirst()
+    }
 }
 
 struct TogetherView: View {
