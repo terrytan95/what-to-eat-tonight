@@ -2,15 +2,33 @@ import CoreImage.CIFilterBuiltins
 import SwiftUI
 
 struct RootView: View {
-    var body: some View {
-        TabView {
-            NavigationStack { PantryView() }
-                .tabItem { Label("食材", systemImage: "carrot") }
-            NavigationStack { DecideView() }
-                .tabItem { Label("决定", systemImage: "sparkles") }
-            NavigationStack { TogetherView() }
-                .tabItem { Label("一起选", systemImage: "person.2") }
+    #if DEBUG
+    private var demoScreen: DemoScreen? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-demoScreen"), arguments.indices.contains(index + 1) else { return nil }
+        return DemoScreen(rawValue: arguments[index + 1])
+    }
+    #endif
+
+    @ViewBuilder var body: some View {
+        #if DEBUG
+        if let demoScreen {
+            DemoScreenView(screen: demoScreen)
+        } else {
+            app
         }
+        #else
+        app
+        #endif
+    }
+
+    private var app: some View {
+        TabView {
+            Tab("食材", systemImage: "carrot.fill") { NavigationStack { PantryView() } }
+            Tab("决定", systemImage: "bolt.fill") { NavigationStack { DecideView() } }
+            Tab("一起选", systemImage: "person.2.fill") { NavigationStack { TogetherView() } }
+        }
+        .tint(AppTheme.orange)
     }
 }
 
@@ -18,108 +36,131 @@ struct PantryView: View {
     @Environment(AppState.self) private var state
     @State private var customIngredient = ""
     @State private var showResults = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var chipColumns: [GridItem] {
+        dynamicTypeSize.isAccessibilitySize
+            ? [GridItem(.flexible()), GridItem(.flexible())]
+            : [GridItem(.adaptive(minimum: 96), spacing: 10)]
+    }
 
     var body: some View {
         @Bindable var state = state
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("冰箱里有什么？").font(.largeTitle.bold())
-                    Text("选出手边食材，今晚少买一点、快做一点。").foregroundStyle(.secondary)
-                }
+            VStack(alignment: .leading, spacing: 22) {
+                ScreenHeader(title: "冰箱里有什么？", subtitle: "选择你有的食材和偏好，看看能做什么")
 
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 82))], spacing: 10) {
-                    ForEach(RecipeCatalog.ingredients, id: \.self) { ingredient in
-                        ingredientButton(ingredient)
-                    }
-                    ForEach(state.selectedIngredients.sorted().filter { !RecipeCatalog.ingredients.contains($0) }, id: \.self) { ingredient in
-                        ingredientButton(ingredient)
-                    }
+                sectionTitle("常见食材")
+                LazyVGrid(columns: chipColumns, spacing: 10) {
+                    ForEach(RecipeCatalog.ingredients, id: \.self) { ingredient in ingredientButton(ingredient) }
+                    ForEach(state.selectedIngredients.sorted().filter { !RecipeCatalog.ingredients.contains($0) }, id: \.self) { ingredient in ingredientButton(ingredient) }
                 }
 
                 HStack {
-                    TextField("添加其他食材", text: $customIngredient)
-                        .textFieldStyle(.roundedBorder)
-                        .submitLabel(.done)
-                        .onSubmit(addIngredient)
+                    TextField("添加其他食材", text: $customIngredient).submitLabel(.done).onSubmit(addIngredient)
                     Button("添加", action: addIngredient).disabled(customIngredient.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
+                .padding(12).appGlassControl(interactive: true)
 
-                VStack(alignment: .leading) {
-                    Text("最多 \(state.maximumMinutes) 分钟").font(.headline)
+                sectionTitle("可用时间")
+                VStack(spacing: 10) {
+                    HStack {
+                        Label("10 分钟", systemImage: "clock").font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Text("\(state.maximumMinutes) 分钟").font(.headline).foregroundStyle(AppTheme.orange)
+                        Spacer()
+                        Text("60 分钟+").font(.caption).foregroundStyle(.secondary)
+                    }
                     Slider(value: Binding(get: { Double(state.maximumMinutes) }, set: { state.maximumMinutes = Int($0) }), in: 10...60, step: 5)
                         .accessibilityLabel("最长烹饪时间")
+                        .accessibilityValue("\(state.maximumMinutes) 分钟")
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("饮食需要").font(.headline)
-                    ForEach(Diet.allCases) { diet in
-                        Toggle(diet.rawValue, isOn: Binding(get: { state.diets.contains(diet) }, set: { enabled in
-                            if enabled { state.diets.insert(diet) } else { state.diets.remove(diet) }
-                        }))
-                    }
+                sectionTitle("饮食偏好")
+                LazyVGrid(columns: chipColumns, spacing: 10) {
+                    ForEach(Diet.allCases) { diet in dietButton(diet) }
                 }
 
                 Button { showResults = true } label: {
-                    Text("看看能做什么").frame(maxWidth: .infinity).padding(.vertical, 8)
+                    Text("看看能做什么").fontWeight(.semibold).frame(maxWidth: .infinity).frame(minHeight: 50)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .appPrimaryButtonStyle().tint(AppTheme.orange)
                 .disabled(state.selectedIngredients.isEmpty)
             }
-            .padding()
+            .padding(.horizontal, 18).padding(.vertical, 16)
         }
-        .navigationTitle("今晚吃什么")
-        .navigationBarTitleDisplayMode(.inline)
+        .background(AppTheme.background)
+        .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showResults) { ResultsView() }
     }
 
+    private func sectionTitle(_ title: String) -> some View { Text(title).font(.headline) }
+
     private func ingredientButton(_ ingredient: String) -> some View {
         let selected = state.selectedIngredients.contains(ingredient)
-        return Button {
-            state.selectedIngredients.formSymmetricDifference([ingredient])
-        } label: {
-            Text(ingredient).frame(maxWidth: .infinity).padding(.vertical, 9)
+        return Button { state.selectedIngredients.formSymmetricDifference([ingredient]) } label: {
+            HStack(spacing: 6) {
+                Text(ingredient.ingredientEmoji)
+                Text(ingredient).lineLimit(1)
+                if selected { Image(systemName: "checkmark.circle.fill").font(.caption) }
+            }
+            .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.capsule)
-        .tint(selected ? .orange : .secondary)
-        .accessibilityAddTraits(selected ? .isSelected : [])
+        .buttonStyle(.plain).selectedChip(selected)
+    }
+
+    private func dietButton(_ diet: Diet) -> some View {
+        let selected = state.diets.contains(diet)
+        return Button {
+            if selected { state.diets.remove(diet) } else { state.diets.insert(diet) }
+        } label: {
+            HStack { Image(systemName: diet == .vegetarian ? "leaf.fill" : diet == .dairyFree ? "drop.fill" : "checkmark.seal.fill"); Text(diet.rawValue) }
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain).selectedChip(selected)
     }
 
     private func addIngredient() {
         let value = customIngredient.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return }
-        state.selectedIngredients.insert(value)
-        customIngredient = ""
+        state.selectedIngredients.insert(value); customIngredient = ""
     }
 }
 
 struct ResultsView: View {
     @Environment(AppState.self) private var state
-
     private var recommendations: [Recommendation] {
         RecommendationEngine.recommendations(ingredients: state.selectedIngredients, maximumMinutes: state.maximumMinutes, diets: state.diets, excluding: state.disliked)
     }
 
     var body: some View {
-        Group {
-            if recommendations.isEmpty {
-                ContentUnavailableView("暂时没有合适结果", systemImage: "fork.knife", description: Text("放宽烹饪时间或饮食条件再试试。"))
-            } else {
-                List(recommendations) { result in
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(recommendations) { result in
                     NavigationLink(value: result.recipe) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("\(result.recipe.emoji) \(result.recipe.name)").font(.headline)
-                            Text("\(result.recipe.minutes) 分钟 · 已有 \(result.available.count)/\(result.recipe.ingredients.count) 种食材").foregroundStyle(.secondary)
-                            if !result.missing.isEmpty { Text("还缺：\(result.missing.joined(separator: "、"))").font(.caption).foregroundStyle(.orange) }
-                        }.padding(.vertical, 6)
-                    }
+                        HStack(spacing: 14) {
+                            FoodIcon(emoji: result.recipe.emoji, size: 62)
+                            VStack(alignment: .leading, spacing: 7) {
+                                Text(result.recipe.name).font(.headline)
+                                HStack(spacing: 10) {
+                                    Label("\(result.recipe.minutes) 分钟", systemImage: "clock")
+                                    Text("\(Int(Double(result.available.count) / Double(result.recipe.ingredients.count) * 100))% 食材")
+                                }.font(.caption).foregroundStyle(.secondary)
+                                Text(result.missing.isEmpty ? "完全匹配" : "缺 \(result.missing.joined(separator: "、"))")
+                                    .font(.caption.weight(.medium)).foregroundStyle(result.missing.isEmpty ? AppTheme.green : AppTheme.orange)
+                            }
+                            Spacer(); Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+                        }
+                        .contentShape(Rectangle()).appCard(padding: 12)
+                    }.buttonStyle(.plain)
                 }
-            }
+            }.padding(18)
         }
+        .background(AppTheme.background)
         .navigationTitle("推荐给你")
+        .navigationBarTitleDisplayMode(.large)
         .navigationDestination(for: Recipe.self) { RecipeDetailView(recipe: $0) }
+        .overlay { if recommendations.isEmpty { ContentUnavailableView("暂时没有合适结果", systemImage: "fork.knife", description: Text("放宽烹饪时间或饮食条件再试试。")) } }
     }
 }
 
@@ -128,83 +169,95 @@ struct RecipeDetailView: View {
     let recipe: Recipe
 
     var body: some View {
-        List {
-            Section {
-                HStack { Text(recipe.emoji).font(.system(size: 58)); VStack(alignment: .leading) { Text(recipe.name).font(.title.bold()); Text("约 \(recipe.minutes) 分钟").foregroundStyle(.secondary) } }
-            }
-            Section("需要的食材") { ForEach(recipe.ingredients, id: \.self) { Text($0) } }
-            Section("简单做法") { ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, step in Text("\(index + 1). \(step)") } }
-            Section {
-                Button(state.favorites.contains(recipe.id) ? "取消收藏" : "收藏") { state.toggleFavorite(recipe.id) }
-                Button("不喜欢这个", role: .destructive) { state.dislike(recipe.id) }
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(spacing: 14) {
+                    FoodIcon(emoji: recipe.emoji, size: 156)
+                    HStack(spacing: 24) {
+                        Label("\(recipe.minutes) 分钟", systemImage: "clock")
+                        Label("简单", systemImage: "chart.bar.fill")
+                    }.font(.subheadline).foregroundStyle(.secondary)
+                }.frame(maxWidth: .infinity)
+
+                Divider()
+                Text("食材（2–3 人份）").font(.headline)
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 12) {
+                    ForEach(recipe.ingredients, id: \.self) { Text("\($0.ingredientEmoji)  \($0)") }
+                }
+                Divider()
+                Text("步骤").font(.headline)
+                ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, step in
+                    HStack(alignment: .top, spacing: 12) {
+                        Text("\(index + 1)").font(.caption.bold()).foregroundStyle(.white).frame(width: 25, height: 25).background(AppTheme.orange, in: Circle())
+                        Text(step).font(.body).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }.padding(20).padding(.bottom, 86)
         }
-        .navigationTitle(recipe.name)
-        .navigationBarTitleDisplayMode(.inline)
+        .background(AppTheme.background)
+        .navigationTitle(recipe.name).navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom) {
+            HStack(spacing: 12) {
+                Button { state.toggleFavorite(recipe.id) } label: { Label(state.favorites.contains(recipe.id) ? "已收藏" : "收藏", systemImage: state.favorites.contains(recipe.id) ? "heart.fill" : "heart").frame(maxWidth: .infinity).frame(minHeight: 44) }
+                Button { state.dislike(recipe.id) } label: { Label("不喜欢", systemImage: "hand.thumbsdown").frame(maxWidth: .infinity).frame(minHeight: 44) }
+            }
+            .fontWeight(.medium).padding(10).appGlassControl().padding(.horizontal)
+        }
     }
 }
 
 struct DecideView: View {
     @Environment(AppState.self) private var state
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var mode: DinnerMode = .cook
     @State private var current: DinnerChoice?
     @State private var remaining: [DinnerChoice] = []
+    var startsWithChoice = false
+
+    private var selectedRecipe: Recipe? { RecipeCatalog.recipes.first { $0.id == current?.id } }
 
     var body: some View {
-        VStack(spacing: 28) {
-            VStack(spacing: 8) {
-                Text("别想了，就吃这个").font(.largeTitle.bold()).multilineTextAlignment(.center)
-                Text("先做决定，想换再换。").foregroundStyle(.secondary)
-            }
-            Picker("用餐方式", selection: $mode) {
-                ForEach(DinnerMode.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .onChange(of: mode) { reset() }
+        ScrollView {
+        VStack(spacing: 22) {
+            ScreenHeader(title: "别想了，就吃这个", subtitle: "一键决定，告别选择困难")
+            Picker("用餐方式", selection: $mode) { ForEach(DinnerMode.allCases) { Text($0.rawValue).tag($0) } }
+                .pickerStyle(.segmented).onChange(of: mode) { reset() }
 
             if let current {
                 VStack(spacing: 14) {
-                    Text(current.emoji).font(.system(size: 82))
-                    Text(current.name).font(.system(.largeTitle, design: .rounded, weight: .bold))
-                    Text(current.reason).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    Text(current.name).font(.system(.title, design: .rounded, weight: .bold))
+                    FoodIcon(emoji: current.emoji, size: 174)
+                    HStack(spacing: 24) {
+                        if let selectedRecipe { Label("\(selectedRecipe.minutes) 分钟", systemImage: "clock") }
+                        Label(mode == .cook ? "简单" : "外出", systemImage: mode == .cook ? "chart.bar.fill" : "figure.walk")
+                    }
+                        .font(.subheadline).foregroundStyle(.secondary)
+                    Text(current.reason).font(.footnote).foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, minHeight: 260)
-                .padding()
-                .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 28))
+                .frame(maxWidth: .infinity, minHeight: 310).appCard()
+                .transition(reduceMotion ? .opacity : .scale(scale: 0.96).combined(with: .opacity))
 
-                Button("就吃这个") { state.choose(current.id) }
-                    .buttonStyle(.borderedProminent).controlSize(.large)
-                Button("换一个") { pickNext() }.disabled(remaining.isEmpty)
-                Button("以后少推荐这个", role: .destructive) {
-                    state.dislike(current.id)
-                    pickNext()
-                }
+                Button { state.choose(current.id) } label: {
+                    Text("就吃这个").fontWeight(.semibold).frame(maxWidth: .infinity).frame(minHeight: 50)
+                }.appPrimaryButtonStyle().tint(AppTheme.orange)
+                Button { pickNext() } label: { Label("换一个", systemImage: "arrow.clockwise").frame(maxWidth: .infinity).frame(minHeight: 46) }.appSecondaryButtonStyle()
+                Button("以后少推荐这个", role: .destructive) { state.dislike(current.id); pickNext() }.font(.footnote)
             } else {
-                ContentUnavailableView("准备好了吗？", systemImage: "sparkles", description: Text("点一下，今晚的选择就交给我。"))
-                Button("帮我决定") { reset(); pickNext() }
-                    .buttonStyle(.borderedProminent).controlSize(.large)
+                Image(systemName: "sparkles").font(.system(size: 58)).foregroundStyle(AppTheme.orange).padding(.top, 80)
+                Text("准备好了吗？").font(.title2.bold())
+                Button("帮我决定") { reset(); pickNext() }.frame(maxWidth: .infinity).frame(minHeight: 50).appPrimaryButtonStyle().tint(AppTheme.orange)
             }
-            Spacer()
-        }
-        .padding()
-        .navigationTitle("快速决定")
-        .onChange(of: state.maximumMinutes) { reset() }
+        }}
+        .padding(18).background(AppTheme.background).toolbar(.hidden, for: .navigationBar)
+        .onAppear { if startsWithChoice, current == nil { reset(); pickNext() } }
     }
 
     private func reset() {
         current = nil
         remaining = DinnerDecider.choices(mode: mode, maximumMinutes: state.maximumMinutes, diets: state.diets, excluding: state.disliked)
-            .sorted { lhs, rhs in
-                let leftRecent = state.recentChoices.firstIndex(of: lhs.id) ?? .max
-                let rightRecent = state.recentChoices.firstIndex(of: rhs.id) ?? .max
-                return leftRecent > rightRecent
-            }
+            .sorted { (state.recentChoices.firstIndex(of: $0.id) ?? .max) > (state.recentChoices.firstIndex(of: $1.id) ?? .max) }
     }
-
-    private func pickNext() {
-        if remaining.isEmpty { reset() }
-        current = remaining.isEmpty ? nil : remaining.removeFirst()
-    }
+    private func pickNext() { if remaining.isEmpty { reset() }; withAnimation(.snappy) { current = remaining.isEmpty ? nil : remaining.removeFirst() } }
 }
 
 struct TogetherView: View {
@@ -214,114 +267,168 @@ struct TogetherView: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            VStack(spacing: 8) {
-                Text("两个人，都满意").font(.largeTitle.bold()).multilineTextAlignment(.center)
-                Text("在同一网络附近，输入房间码即可一起选。无需注册。")
-                    .foregroundStyle(.secondary).multilineTextAlignment(.center)
-            }
-
-            Button {
-                room.create()
-                showVoting = true
-            } label: {
-                Label("创建房间", systemImage: "plus.circle.fill").frame(maxWidth: .infinity).padding(.vertical, 8)
-            }
-            .buttonStyle(.borderedProminent).controlSize(.large)
-
+            ScreenHeader(title: "两个人，都满意", subtitle: "创建房间，一起找到共同喜欢的菜")
+            HStack(spacing: 20) {
+                avatar("person.crop.circle.fill", color: .blue); Image(systemName: "heart.fill").font(.largeTitle).foregroundStyle(AppTheme.pink); avatar("person.crop.circle.fill", color: AppTheme.orange)
+            }.padding(.vertical, 22)
+            Button { room.create(); showVoting = true } label: { Label("创建房间", systemImage: "plus.circle.fill").frame(maxWidth: .infinity).frame(minHeight: 50) }
+                .appPrimaryButtonStyle().tint(AppTheme.orange)
             HStack {
-                Divider()
-                Text("或者加入").font(.caption).foregroundStyle(.secondary)
-                Divider()
+                Rectangle().fill(.primary.opacity(0.15)).frame(height: 0.5)
+                Text("或加入已有房间").font(.caption).foregroundStyle(.secondary).fixedSize()
+                Rectangle().fill(.primary.opacity(0.15)).frame(height: 0.5)
             }
-
-            TextField("六位房间码", text: $enteredCode)
-                .keyboardType(.numberPad)
-                .textContentType(.oneTimeCode)
-                .multilineTextAlignment(.center)
-                .font(.title2.monospacedDigit())
-                .textFieldStyle(.roundedBorder)
-                .onChange(of: enteredCode) { enteredCode = String(enteredCode.filter(\.isNumber).prefix(6)) }
-
-            Button("加入房间") {
-                room.join(code: enteredCode)
-                if room.code.count == 6 { showVoting = true }
-            }
-            .buttonStyle(.bordered)
-            .disabled(enteredCode.count != 6)
+            TextField("1  2  3  4  5  6", text: $enteredCode)
+                .keyboardType(.numberPad).textContentType(.oneTimeCode).multilineTextAlignment(.center).font(.title.monospacedDigit().weight(.semibold))
+                .padding().appGlassControl().onChange(of: enteredCode) { enteredCode = String(enteredCode.filter(\.isNumber).prefix(6)) }
+            Button("加入房间") { room.join(code: enteredCode); if room.code.count == 6 { showVoting = true } }
+                .frame(maxWidth: .infinity).frame(minHeight: 46).appSecondaryButtonStyle().disabled(enteredCode.count != 6)
             Spacer()
         }
-        .padding()
-        .navigationTitle("一起选")
+        .padding(18).background(AppTheme.background).toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showVoting) { VotingRoomView(room: room) }
+        .onChange(of: showVoting) { oldValue, newValue in if oldValue, !newValue { room.stop() } }
         .onDisappear { if !showVoting { room.stop() } }
     }
+
+    private func avatar(_ symbol: String, color: Color) -> some View { Image(systemName: symbol).font(.system(size: 68)).foregroundStyle(color).accessibilityHidden(true) }
 }
 
 struct VotingRoomView: View {
     @Bindable var room: NearbyRoom
 
     var body: some View {
-        List {
-            Section {
+        ScrollView {
+            VStack(spacing: 14) {
                 HStack {
-                    VStack(alignment: .leading) {
-                        Text("房间码").font(.caption).foregroundStyle(.secondary)
-                        Text(room.code).font(.title.monospacedDigit().bold()).textSelection(.enabled)
-                    }
-                    Spacer()
-                    ShareLink(item: "打开 WhatToEatTonight，加入房间 \(room.code)") { Label("邀请", systemImage: "square.and.arrow.up") }
-                }
-                Text(room.status).font(.footnote).foregroundStyle(.secondary)
-                QRCodeView(value: room.code).frame(maxWidth: .infinity).listRowBackground(Color.clear)
-            }
+                    Label(room.status, systemImage: "circle.fill").font(.caption).foregroundStyle(AppTheme.green)
+                    Spacer(); QRCodeView(value: room.code).frame(width: 74, height: 74)
+                }.appCard(padding: 12)
 
-            if !room.matches.isEmpty {
-                Section("共同喜欢") {
-                    ForEach(room.matches) { recipe in
-                        NavigationLink(value: recipe) { Label("\(recipe.emoji) \(recipe.name)", systemImage: "heart.fill").foregroundStyle(.pink) }
-                    }
+                if let match = room.matches.first {
+                    NavigationLink(value: match) { Label("共同喜欢：\(match.name)", systemImage: "heart.fill").frame(maxWidth: .infinity) }
+                        .foregroundStyle(AppTheme.pink).appCard(padding: 14).buttonStyle(.plain)
+                } else if let fallback = room.bestFallback {
+                    NavigationLink(value: fallback) { Label("当前最受欢迎：\(fallback.name)", systemImage: "star.fill").frame(maxWidth: .infinity) }
+                        .appCard(padding: 14).buttonStyle(.plain)
                 }
-            } else if let fallback = room.bestFallback {
-                Section("当前最受欢迎") {
-                    NavigationLink(value: fallback) { Text("\(fallback.emoji) \(fallback.name)") }
-                }
-            }
 
-            Section("喜欢就点一下") {
-                ForEach(RecipeCatalog.recipes) { recipe in
-                    let liked = room.votes[room.localParticipant]?.likedRecipeIDs.contains(recipe.id) == true
-                    Button { room.toggleLike(recipe.id) } label: {
-                        HStack {
-                            Text("\(recipe.emoji) \(recipe.name)").foregroundStyle(.primary)
-                            Spacer()
-                            Image(systemName: liked ? "heart.fill" : "heart").foregroundStyle(liked ? .pink : .secondary)
-                        }
+                VStack(spacing: 0) {
+                    HStack {
+                        Spacer(); Text("我").frame(width: 34); Text("对方").frame(width: 34)
+                    }.font(.caption2).foregroundStyle(.secondary).padding(.bottom, 4)
+                    ForEach(RecipeCatalog.recipes) { recipe in
+                        let liked = room.votes[room.localParticipant]?.likedRecipeIDs.contains(recipe.id) == true
+                        let remoteLiked = room.votes.values.filter { $0.participant != room.localParticipant }.contains { $0.likedRecipeIDs.contains(recipe.id) }
+                        Button { room.toggleLike(recipe.id) } label: {
+                            HStack(spacing: 12) {
+                                FoodIcon(emoji: recipe.emoji, size: 44)
+                                VStack(alignment: .leading) { Text(recipe.name).font(.headline); Text("\(recipe.minutes) 分钟 · 简单").font(.caption).foregroundStyle(.secondary) }
+                                Spacer()
+                                Image(systemName: liked ? "heart.fill" : "heart").font(.title3).foregroundStyle(liked ? AppTheme.pink : .secondary).frame(width: 34)
+                                Image(systemName: remoteLiked ? "heart.fill" : "heart").font(.title3).foregroundStyle(remoteLiked ? AppTheme.pink : .secondary).frame(width: 34).allowsHitTesting(false)
+                            }.padding(.vertical, 11)
+                        }.buttonStyle(.plain).accessibilityValue("我\(liked ? "已喜欢" : "未选择")，对方\(remoteLiked ? "已喜欢" : "未选择")")
+                        if recipe.id != RecipeCatalog.recipes.last?.id { Divider() }
                     }
-                    .accessibilityValue(liked ? "已喜欢" : "未选择")
-                }
-            }
+                }.appCard(padding: 12)
+                Text("双方各点“♡”，找到共同喜欢的菜吧！").font(.footnote).foregroundStyle(.secondary)
+            }.padding(18)
         }
-        .navigationTitle("共同决定")
-        .navigationBarTitleDisplayMode(.inline)
+        .background(AppTheme.background).navigationTitle("房间：\(room.code)").navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ShareLink(item: "打开 WhatToEatTonight，加入房间 \(room.code)") { Image(systemName: "square.and.arrow.up") }
+                .accessibilityLabel("邀请")
+        }
+        .navigationDestination(for: Recipe.self) { recipe in room.matches.contains(recipe) ? AnyView(MatchResultView(recipe: recipe)) : AnyView(RecipeDetailView(recipe: recipe)) }
+    }
+}
+
+struct MatchResultView: View {
+    @Environment(\.dismiss) private var dismiss
+    let recipe: Recipe
+    var body: some View {
+        ScrollView {
+        VStack(spacing: 18) {
+            Text("🎉  共同喜欢  🎉").font(.system(.largeTitle, design: .rounded, weight: .bold)).padding(.top, 120)
+            Text("你们都爱这道菜！").foregroundStyle(.secondary)
+            VStack(spacing: 14) {
+                FoodIcon(emoji: recipe.emoji, size: 176); Text(recipe.name).font(.system(.title, design: .rounded, weight: .bold))
+                HStack(spacing: 24) { Label("\(recipe.minutes) 分钟", systemImage: "clock"); Label("简单", systemImage: "chart.bar.fill") }.font(.subheadline).foregroundStyle(.secondary)
+            }.frame(maxWidth: .infinity).appCard()
+            NavigationLink(value: recipe) {
+                Text("去做这道菜").fontWeight(.semibold).frame(maxWidth: .infinity).frame(minHeight: 50)
+            }.appPrimaryButtonStyle().tint(AppTheme.orange)
+            Button { dismiss() } label: {
+                Text("再找其他菜").frame(maxWidth: .infinity).frame(minHeight: 46)
+            }.appSecondaryButtonStyle()
+        }.padding(18)}.background(AppTheme.background).toolbar(.hidden, for: .navigationBar)
         .navigationDestination(for: Recipe.self) { RecipeDetailView(recipe: $0) }
-        .onDisappear { room.stop() }
     }
 }
 
 private struct QRCodeView: View {
     let value: String
+    var body: some View {
+        if let image { Image(uiImage: image).interpolation(.none).resizable().scaledToFit().accessibilityLabel("房间码二维码 \(value)") }
+    }
+    private var image: UIImage? {
+        let filter = CIFilter.qrCodeGenerator(); filter.message = Data(value.utf8)
+        guard let output = filter.outputImage,
+              let cgImage = CIContext().createCGImage(output, from: output.extent) else { return nil }
+        return UIImage(cgImage: cgImage)
+    }
+}
+
+#if DEBUG
+private enum DemoScreen: String { case pantry, results, detail, decide, together, voting, match }
+
+private struct DemoScreenView: View {
+    @Environment(AppState.self) private var state
+    let screen: DemoScreen
+    @State private var room = NearbyRoom()
+    @State private var selectedTab: Int
+
+    init(screen: DemoScreen) {
+        self.screen = screen
+        _selectedTab = State(initialValue: switch screen {
+        case .pantry, .results, .detail: 0
+        case .decide: 1
+        case .together, .voting, .match: 2
+        })
+    }
 
     var body: some View {
-        if let image = image {
-            Image(uiImage: image).interpolation(.none).resizable().scaledToFit().frame(width: 150, height: 150)
-                .accessibilityLabel("房间码二维码 \(value)")
+        TabView(selection: $selectedTab) {
+            NavigationStack { foodScreen }.tabItem { Label("食材", systemImage: "carrot.fill") }.tag(0)
+            NavigationStack { DecideView(startsWithChoice: screen == .decide) }.tabItem { Label("决定", systemImage: "bolt.fill") }.tag(1)
+            NavigationStack { togetherScreen }.tabItem { Label("一起选", systemImage: "person.2.fill") }.tag(2)
+        }
+        .tint(AppTheme.orange)
+        .onAppear {
+            if state.selectedIngredients.isEmpty { state.selectedIngredients = ["鸡蛋", "番茄", "土豆", "洋葱", "青菜"] }
         }
     }
 
-    private var image: UIImage? {
-        let filter = CIFilter.qrCodeGenerator()
-        filter.message = Data(value.utf8)
-        guard let output = filter.outputImage else { return nil }
-        return UIImage(ciImage: output.transformed(by: .init(scaleX: 8, y: 8)))
+    @ViewBuilder private var foodScreen: some View {
+        switch screen {
+        case .results: ResultsView()
+        case .detail: RecipeDetailView(recipe: RecipeCatalog.recipes[0])
+        default: PantryView()
+        }
+    }
+
+    @ViewBuilder private var togetherScreen: some View {
+        switch screen {
+        case .voting: VotingRoomView(room: room).task { seedRoom(match: false) }
+        case .match: MatchResultView(recipe: RecipeCatalog.recipes[0])
+        default: TogetherView()
+        }
+    }
+
+    private func seedRoom(match: Bool) {
+        room.code = "123456"; room.status = "2 人在线"
+        room.votes = [room.localParticipant: .init(participant: room.localParticipant, likedRecipeIDs: ["tomato-eggs"]), "对方": .init(participant: "对方", likedRecipeIDs: match ? ["tomato-eggs"] : [])]
     }
 }
+#endif
