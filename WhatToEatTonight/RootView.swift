@@ -1,0 +1,152 @@
+import SwiftUI
+
+struct RootView: View {
+    var body: some View {
+        TabView {
+            NavigationStack { PantryView() }
+                .tabItem { Label("食材", systemImage: "carrot") }
+            NavigationStack { DecideView() }
+                .tabItem { Label("决定", systemImage: "sparkles") }
+            NavigationStack { TogetherView() }
+                .tabItem { Label("一起选", systemImage: "person.2") }
+        }
+    }
+}
+
+struct PantryView: View {
+    @Environment(AppState.self) private var state
+    @State private var customIngredient = ""
+    @State private var showResults = false
+
+    var body: some View {
+        @Bindable var state = state
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("冰箱里有什么？").font(.largeTitle.bold())
+                    Text("选出手边食材，今晚少买一点、快做一点。").foregroundStyle(.secondary)
+                }
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 82))], spacing: 10) {
+                    ForEach(RecipeCatalog.ingredients, id: \.self) { ingredient in
+                        ingredientButton(ingredient)
+                    }
+                    ForEach(state.selectedIngredients.sorted().filter { !RecipeCatalog.ingredients.contains($0) }, id: \.self) { ingredient in
+                        ingredientButton(ingredient)
+                    }
+                }
+
+                HStack {
+                    TextField("添加其他食材", text: $customIngredient)
+                        .textFieldStyle(.roundedBorder)
+                        .submitLabel(.done)
+                        .onSubmit(addIngredient)
+                    Button("添加", action: addIngredient).disabled(customIngredient.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+
+                VStack(alignment: .leading) {
+                    Text("最多 \(state.maximumMinutes) 分钟").font(.headline)
+                    Slider(value: Binding(get: { Double(state.maximumMinutes) }, set: { state.maximumMinutes = Int($0) }), in: 10...60, step: 5)
+                        .accessibilityLabel("最长烹饪时间")
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("饮食需要").font(.headline)
+                    ForEach(Diet.allCases) { diet in
+                        Toggle(diet.rawValue, isOn: Binding(get: { state.diets.contains(diet) }, set: { enabled in
+                            if enabled { state.diets.insert(diet) } else { state.diets.remove(diet) }
+                        }))
+                    }
+                }
+
+                Button { showResults = true } label: {
+                    Text("看看能做什么").frame(maxWidth: .infinity).padding(.vertical, 8)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(state.selectedIngredients.isEmpty)
+            }
+            .padding()
+        }
+        .navigationTitle("今晚吃什么")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $showResults) { ResultsView() }
+    }
+
+    private func ingredientButton(_ ingredient: String) -> some View {
+        let selected = state.selectedIngredients.contains(ingredient)
+        return Button {
+            state.selectedIngredients.formSymmetricDifference([ingredient])
+        } label: {
+            Text(ingredient).frame(maxWidth: .infinity).padding(.vertical, 9)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .tint(selected ? .orange : .secondary)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func addIngredient() {
+        let value = customIngredient.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        state.selectedIngredients.insert(value)
+        customIngredient = ""
+    }
+}
+
+struct ResultsView: View {
+    @Environment(AppState.self) private var state
+
+    private var recommendations: [Recommendation] {
+        RecommendationEngine.recommendations(ingredients: state.selectedIngredients, maximumMinutes: state.maximumMinutes, diets: state.diets, excluding: state.disliked)
+    }
+
+    var body: some View {
+        Group {
+            if recommendations.isEmpty {
+                ContentUnavailableView("暂时没有合适结果", systemImage: "fork.knife", description: Text("放宽烹饪时间或饮食条件再试试。"))
+            } else {
+                List(recommendations) { result in
+                    NavigationLink(value: result.recipe) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("\(result.recipe.emoji) \(result.recipe.name)").font(.headline)
+                            Text("\(result.recipe.minutes) 分钟 · 已有 \(result.available.count)/\(result.recipe.ingredients.count) 种食材").foregroundStyle(.secondary)
+                            if !result.missing.isEmpty { Text("还缺：\(result.missing.joined(separator: "、"))").font(.caption).foregroundStyle(.orange) }
+                        }.padding(.vertical, 6)
+                    }
+                }
+            }
+        }
+        .navigationTitle("推荐给你")
+        .navigationDestination(for: Recipe.self) { RecipeDetailView(recipe: $0) }
+    }
+}
+
+struct RecipeDetailView: View {
+    @Environment(AppState.self) private var state
+    let recipe: Recipe
+
+    var body: some View {
+        List {
+            Section {
+                HStack { Text(recipe.emoji).font(.system(size: 58)); VStack(alignment: .leading) { Text(recipe.name).font(.title.bold()); Text("约 \(recipe.minutes) 分钟").foregroundStyle(.secondary) } }
+            }
+            Section("需要的食材") { ForEach(recipe.ingredients, id: \.self) { Text($0) } }
+            Section("简单做法") { ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, step in Text("\(index + 1). \(step)") } }
+            Section {
+                Button(state.favorites.contains(recipe.id) ? "取消收藏" : "收藏") { state.toggleFavorite(recipe.id) }
+                Button("不喜欢这个", role: .destructive) { state.dislike(recipe.id) }
+            }
+        }
+        .navigationTitle(recipe.name)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct DecideView: View {
+    var body: some View { ContentUnavailableView("下一阶段", systemImage: "sparkles", description: Text("一键决定功能正在准备。")) }
+}
+
+struct TogetherView: View {
+    var body: some View { ContentUnavailableView("下一阶段", systemImage: "person.2", description: Text("共同决定功能正在准备。")) }
+}
