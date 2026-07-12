@@ -62,6 +62,9 @@ struct SettingsView: View {
                 Button("删除全部数据", systemImage: "trash", role: .destructive) { showDeleteConfirmation = true }
             }
             Section("记录") {
+                NavigationLink { CustomRecipesView() } label: {
+                    Label("我的菜谱", systemImage: "book.pages")
+                }
                 NavigationLink { MealHistoryView() } label: {
                     Label("饮食日历", systemImage: "calendar")
                     Spacer()
@@ -115,7 +118,7 @@ struct MealHistoryView: View {
 
     var body: some View {
         List(state.mealHistory) { record in
-            let recipe = RecipeCatalog.recipes.first { $0.id == record.recipeID }
+            let recipe = state.allRecipes.first { $0.id == record.recipeID }
             HStack(spacing: 12) {
                 Text(recipe?.emoji ?? "🍽️").font(.title2)
                 VStack(alignment: .leading, spacing: 3) {
@@ -254,7 +257,7 @@ struct PantryView: View {
 struct ResultsView: View {
     @Environment(AppState.self) private var state
     private var recommendations: [Recommendation] {
-        RecommendationEngine.recommendations(ingredients: state.selectedIngredients, maximumMinutes: state.maximumMinutes, diets: state.diets, excluding: state.disliked, ratings: state.ratings, recentIDs: state.recentChoices, priorityIngredients: state.expiringIngredients, filters: state.recommendationFilters)
+        RecommendationEngine.recommendations(ingredients: state.selectedIngredients, maximumMinutes: state.maximumMinutes, diets: state.diets, excluding: state.disliked, ratings: state.ratings, recentIDs: state.recentChoices, priorityIngredients: state.expiringIngredients, filters: state.recommendationFilters, recipes: state.allRecipes)
     }
 
     var body: some View {
@@ -373,7 +376,7 @@ struct DecideView: View {
     @State private var remaining: [DinnerChoice] = []
     var startsWithChoice = false
 
-    private var selectedRecipe: Recipe? { RecipeCatalog.recipes.first { $0.id == current?.id } }
+    private var selectedRecipe: Recipe? { state.allRecipes.first { $0.id == current?.id } }
 
     var body: some View {
         ScrollView {
@@ -413,7 +416,7 @@ struct DecideView: View {
 
     private func reset() {
         current = nil
-        remaining = DinnerDecider.choices(mode: mode, maximumMinutes: state.maximumMinutes, diets: state.diets, excluding: state.disliked)
+        remaining = DinnerDecider.choices(mode: mode, maximumMinutes: state.maximumMinutes, diets: state.diets, excluding: state.disliked, recipes: state.allRecipes)
             .sorted { (state.recentChoices.firstIndex(of: $0.id) ?? .max) > (state.recentChoices.firstIndex(of: $1.id) ?? .max) }
     }
     private func pickNext() { if remaining.isEmpty { reset() }; withAnimation(.snappy) { current = remaining.isEmpty ? nil : remaining.removeFirst() } }

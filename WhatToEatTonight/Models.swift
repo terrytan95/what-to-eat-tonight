@@ -148,10 +148,10 @@ enum DinnerDecider {
         DinnerChoice(id: "thai", name: "泰国菜", emoji: "🌶️", reason: "酸辣开胃，适合换换口味")
     ]
 
-    static func choices(mode: DinnerMode, maximumMinutes: Int, diets: Set<Diet>, excluding: Set<String>) -> [DinnerChoice] {
+    static func choices(mode: DinnerMode, maximumMinutes: Int, diets: Set<Diet>, excluding: Set<String>, recipes: [Recipe] = RecipeCatalog.recipes) -> [DinnerChoice] {
         switch mode {
         case .cook:
-            return RecipeCatalog.recipes
+            return recipes
                 .filter { $0.isEligible(maximumMinutes: maximumMinutes, diets: diets, excluding: excluding) }
                 .map { DinnerChoice(id: $0.id, name: $0.name, emoji: $0.emoji, reason: "约 \($0.minutes) 分钟就能上桌") }
         case .eatOut:

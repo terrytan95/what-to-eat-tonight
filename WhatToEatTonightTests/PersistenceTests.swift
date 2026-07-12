@@ -52,5 +52,18 @@ struct PersistenceTests {
         state.addCookingTimer(recipeID: "tomato-eggs", minutes: 5)
         #expect(session.currentStep == 2)
         #expect(state.cookingTimers.count == 1)
+
+        state.addCustomRecipe(
+            name: "健身鸡肉饭",
+            emoji: "🥗",
+            ingredientWeights: ["鸡肉": 240, "米饭": 200, "青菜": 160],
+            minutes: 25,
+            diets: [.dairyFree, .glutenFree],
+            steps: ["煎熟鸡肉", "组合装盘"]
+        )
+        let custom = try #require(state.customRecipes.first?.recipe)
+        #expect(custom.ingredientGrams["鸡肉"] == 240)
+        #expect(NutritionEstimator.estimate(recipe: custom, servings: 1).protein > 35)
+        #expect(RecommendationEngine.recommendations(ingredients: ["鸡肉", "米饭", "青菜"], maximumMinutes: 30, diets: [], recipes: state.allRecipes).contains { $0.recipe.id == custom.id })
     }
 }

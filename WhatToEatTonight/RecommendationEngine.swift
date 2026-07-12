@@ -9,12 +9,13 @@ enum RecommendationEngine {
         ratings: [String: Int] = [:],
         recentIDs: [String] = [],
         priorityIngredients: Set<String> = [],
-        filters: RecommendationFilters = .init()
+        filters: RecommendationFilters = .init(),
+        recipes: [Recipe] = RecipeCatalog.recipes
     ) -> [Recommendation] {
         let aliases = ["西红柿": "番茄", "洋芋": "土豆", "马铃薯": "土豆", "大虾": "虾"]
         let substitutes = ["番茄": "罐装番茄", "鸡蛋": "嫩豆腐", "米饭": "面条", "鸡肉": "豆腐", "牛肉": "鸡肉", "青菜": "任意叶菜", "洋葱": "葱", "奶酪": "无乳奶酪", "面包": "馒头"]
         let normalizedIngredients = Set(ingredients.map { aliases[$0] ?? $0 })
-        return RecipeCatalog.recipes
+        return recipes
             .filter { recipe in
                 let attributes = recipe.attributes
                 return recipe.isEligible(maximumMinutes: maximumMinutes, diets: diets, excluding: excludedIDs)

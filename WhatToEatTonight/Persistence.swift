@@ -144,6 +144,43 @@ final class CookingTimer {
     }
 }
 
+@Model
+final class CustomRecipe {
+    @Attribute(.unique) var id: UUID
+    var name: String
+    var emoji: String
+    var ingredientNames: [String]
+    var ingredientWeights: [Double]
+    var minutes: Int
+    var dietRawValues: [String]
+    var steps: [String]
+
+    init(id: UUID = UUID(), name: String, emoji: String, ingredientWeights: [String: Double], minutes: Int, dietRawValues: [String], steps: [String]) {
+        self.id = id
+        self.name = name
+        self.emoji = emoji
+        let names = ingredientWeights.keys.sorted()
+        ingredientNames = names
+        self.ingredientWeights = names.map { ingredientWeights[$0] ?? 0 }
+        self.minutes = minutes
+        self.dietRawValues = dietRawValues
+        self.steps = steps
+    }
+
+    var recipe: Recipe {
+        Recipe(
+            id: "custom-\(id.uuidString)",
+            name: name,
+            emoji: emoji,
+            ingredients: ingredientNames,
+            ingredientGrams: Dictionary(uniqueKeysWithValues: zip(ingredientNames, ingredientWeights)),
+            minutes: minutes,
+            diets: Set(dietRawValues.compactMap(Diet.init(rawValue:))),
+            steps: steps
+        )
+    }
+}
+
 @MainActor
 final class PersistenceController {
     let container: ModelContainer
@@ -151,7 +188,7 @@ final class PersistenceController {
     init(inMemory: Bool = false) {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: inMemory)
         do {
-            container = try ModelContainer(for: UserProfile.self, MealRecord.self, InventoryItem.self, ShoppingItem.self, FamilyMember.self, MealPlanEntry.self, CookingSession.self, CookingTimer.self, configurations: configuration)
+            container = try ModelContainer(for: UserProfile.self, MealRecord.self, InventoryItem.self, ShoppingItem.self, FamilyMember.self, MealPlanEntry.self, CookingSession.self, CookingTimer.self, CustomRecipe.self, configurations: configuration)
         } catch {
             fatalError("Unable to initialize local storage: \(error.localizedDescription)")
         }

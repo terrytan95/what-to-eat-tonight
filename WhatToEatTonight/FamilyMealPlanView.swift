@@ -23,7 +23,7 @@ struct FamilyMealPlanView: View {
                     Button("生成一周菜单", systemImage: "wand.and.stars") { noResults = !state.generateMealPlan() }
                 } else {
                     ForEach(state.mealPlan) { entry in
-                        let recipe = RecipeCatalog.recipes.first { $0.id == entry.recipeID }
+                        let recipe = state.allRecipes.first { $0.id == entry.recipeID }
                         HStack {
                             VStack(alignment: .leading) {
                                 Text(entry.date, format: .dateTime.weekday(.wide).month().day()).font(.caption).foregroundStyle(.secondary)
