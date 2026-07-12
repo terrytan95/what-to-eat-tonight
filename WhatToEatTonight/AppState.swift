@@ -170,6 +170,15 @@ final class AppState {
         persist()
     }
 
+    func consumeIngredients(_ names: [String]) {
+        // ponytail: quantities are user-defined units; deduct one unit until recipes carry measured amounts.
+        names.compactMap { name in inventory.first { $0.name == name && $0.quantity > 0 } }.forEach { item in
+            item.quantity = max(0, item.quantity - 1)
+            if item.quantity == 0 { selectedIngredients.remove(item.name) }
+        }
+        persist()
+    }
+
     func exportData() throws -> String {
         let meals = mealHistory.map { Archive.Meal(id: $0.id, recipeID: $0.recipeID, cookedAt: $0.cookedAt, rating: $0.rating, note: $0.note) }
         let inventory = inventory.map { Archive.Inventory(id: $0.id, name: $0.name, quantity: $0.quantity, unit: $0.unit, storage: $0.storage, purchasedAt: $0.purchasedAt, expiresAt: $0.expiresAt, isStaple: $0.isStaple, barcode: $0.barcode) }

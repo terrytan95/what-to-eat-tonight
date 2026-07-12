@@ -120,7 +120,7 @@ private struct BatchInventoryView: View {
         NavigationStack {
             Form {
                 TextEditor(text: $text).frame(minHeight: 180)
-                Text("支持换行、顿号、逗号或分号分隔，最多导入 100 项。")
+                Text("支持换行、顿号、逗号或分号分隔，最多导入 100 项；也可点击系统键盘的麦克风直接听写。")
                     .font(.footnote).foregroundStyle(.secondary)
                 Picker("存放位置", selection: $storage) { ForEach(["冷藏", "冷冻", "常温"], id: \.self) { Text($0) } }
             }

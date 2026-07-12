@@ -265,6 +265,7 @@ struct RecipeDetailView: View {
     let recipe: Recipe
     @State private var showRating = false
     @State private var privateEntry = false
+    @State private var showConsume = false
 
     var body: some View {
         ScrollView {
@@ -304,10 +305,19 @@ struct RecipeDetailView: View {
             .fontWeight(.medium).padding(10).appGlassControl().padding(.horizontal)
         }
         .confirmationDialog("这道菜怎么样？", isPresented: $showRating, titleVisibility: .visible) {
-            Button("很好吃") { state.recordMeal(recipe.id, rating: 2, privateEntry: privateEntry) }
-            Button("一般") { state.recordMeal(recipe.id, rating: 1, privateEntry: privateEntry) }
-            Button("不喜欢") { state.recordMeal(recipe.id, rating: 0, privateEntry: privateEntry) }
+            Button("很好吃") { record(rating: 2) }
+            Button("一般") { record(rating: 1) }
+            Button("不喜欢") { record(rating: 0) }
         }
+        .confirmationDialog("同步扣减冰箱库存？", isPresented: $showConsume, titleVisibility: .visible) {
+            Button("每种食材扣减 1 单位") { state.consumeIngredients(recipe.ingredients) }
+            Button("暂不扣减", role: .cancel) {}
+        }
+    }
+
+    private func record(rating: Int) {
+        state.recordMeal(recipe.id, rating: rating, privateEntry: privateEntry)
+        showConsume = state.inventory.contains { recipe.ingredients.contains($0.name) && $0.quantity > 0 }
     }
 }
 
