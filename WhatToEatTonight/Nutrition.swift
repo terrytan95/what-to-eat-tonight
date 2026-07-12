@@ -30,7 +30,7 @@ struct NutritionSummaryView: View {
             }
             Text("按食材重量和典型食材数据估算，烹饪方式、品牌和可食部会造成差异，不用于医疗决策。")
                 .font(.caption2).foregroundStyle(.secondary)
-            Link("数据参考：\(NutritionEstimator.sourceName)", destination: NutritionEstimator.sourceURL).font(.caption2)
+            Link("查看数据来源：USDA FDC", destination: NutritionEstimator.sourceURL).font(.caption2)
         }.appCard()
     }
 

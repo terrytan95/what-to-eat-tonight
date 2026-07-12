@@ -70,30 +70,29 @@ enum AppNotifications {
 
     static func cancelDinnerReminder() { UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["dinner-reminder"]) }
 
-    static func scheduleTimer(_ timer: CookingTimer) async {
-        guard timer.endDate > .now, await requestAuthorization() else { return }
+    static func scheduleTimer(id: UUID, label: String, endDate: Date) async {
+        guard endDate > .now, await requestAuthorization() else { return }
         let content = UNMutableNotificationContent()
         content.title = "烹饪计时完成"
-        content.body = timer.label
+        content.body = label
         content.sound = .default
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, timer.endDate.timeIntervalSinceNow), repeats: false)
-        try? await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "cooking-\(timer.id)", content: content, trigger: trigger))
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, endDate.timeIntervalSinceNow), repeats: false)
+        try? await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "cooking-\(id)", content: content, trigger: trigger))
     }
 
-    static func cancelTimer(_ timer: CookingTimer) { UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["cooking-\(timer.id)"]) }
+    static func cancelTimer(id: UUID) { UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["cooking-\(id)"]) }
 
-    static func scheduleExpiry(for item: InventoryItem) async {
-        guard let expiry = item.expiresAt,
-              let reminder = Calendar.current.date(byAdding: .day, value: -1, to: expiry),
+    static func scheduleExpiry(id: UUID, name: String, expiresAt: Date) async {
+        guard let reminder = Calendar.current.date(byAdding: .day, value: -1, to: expiresAt),
               reminder > .now,
               await requestAuthorization()
         else { return }
         let content = UNMutableNotificationContent()
         content.title = "食材即将过期"
-        content.body = "\(item.name) 明天到期，今晚优先用掉吧。"
+        content.body = "\(name) 明天到期，今晚优先用掉吧。"
         content.sound = .default
         let components = Calendar.current.dateComponents([.year, .month, .day], from: reminder).merging(DateComponents(hour: 9))
-        try? await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "expiry-\(item.id)", content: content, trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: false)))
+        try? await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "expiry-\(id)", content: content, trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: false)))
     }
 }
 
