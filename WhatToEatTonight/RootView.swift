@@ -254,6 +254,7 @@ struct ResultsView: View {
                                 Text(result.missing.isEmpty ? "完全匹配" : "缺 \(result.missing.joined(separator: "、"))")
                                     .font(.caption.weight(.medium)).foregroundStyle(result.missing.isEmpty ? AppTheme.green : AppTheme.orange)
                                 Text(result.reason).font(.caption2).foregroundStyle(.secondary)
+                                if let substitution = result.substitutions.first { Text(substitution).font(.caption2).foregroundStyle(AppTheme.orange) }
                             }
                             Spacer(); Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
                         }
@@ -289,7 +290,7 @@ struct RecipeDetailView: View {
                 }.frame(maxWidth: .infinity)
 
                 Divider()
-                Text("食材（2–3 人份）").font(.headline)
+                Text("食材（\(state.servings) 人份）").font(.headline)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 12) {
                     ForEach(recipe.ingredients, id: \.self) { Text("\($0.ingredientEmoji)  \($0)") }
                 }

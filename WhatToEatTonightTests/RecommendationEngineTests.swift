@@ -54,4 +54,9 @@ struct RecommendationEngineTests {
         let results = RecommendationEngine.recommendations(ingredients: ["豆腐", "蘑菇", "青菜"], maximumMinutes: 30, diets: [.vegetarian], filters: filters)
         #expect(results.map(\.recipe.id) == ["tofu-mushroom"])
     }
+
+    @Test func suggestsKnownIngredientSubstitutions() {
+        let result = RecommendationEngine.recommendations(ingredients: ["番茄"], maximumMinutes: 20, diets: []).first { $0.recipe.id == "tomato-eggs" }
+        #expect(result?.substitutions == ["鸡蛋可换嫩豆腐"])
+    }
 }

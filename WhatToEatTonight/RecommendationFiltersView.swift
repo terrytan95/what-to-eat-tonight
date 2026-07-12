@@ -17,6 +17,7 @@ struct RecommendationFiltersView: View {
                     Text("不限").tag(nil as Int?)
                     ForEach([20, 30, 50, 80], id: \.self) { Text("¥\($0) 以内").tag(Optional($0)) }
                 }
+                Stepper("用餐人数：\(state.servings) 人", value: Binding(get: { state.servings }, set: { state.servings = $0 }), in: 1...12)
                 Section { Text("营养选项仅用于一般饮食偏好，不构成医疗或营养建议。") }.font(.footnote).foregroundStyle(.secondary)
             }
             .navigationTitle("更多筛选")

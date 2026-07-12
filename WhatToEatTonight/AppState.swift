@@ -42,6 +42,7 @@ final class AppState {
     var mealHistory: [MealRecord] = []
     var inventory: [InventoryItem] = []
     var recommendationFilters = RecommendationFilters()
+    var servings = 2
 
     private let context: ModelContext
     private let profile: UserProfile

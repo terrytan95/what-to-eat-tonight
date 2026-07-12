@@ -12,6 +12,7 @@ enum RecommendationEngine {
         filters: RecommendationFilters = .init()
     ) -> [Recommendation] {
         let aliases = ["西红柿": "番茄", "洋芋": "土豆", "马铃薯": "土豆", "大虾": "虾"]
+        let substitutes = ["番茄": "罐装番茄", "鸡蛋": "嫩豆腐", "米饭": "面条", "鸡肉": "豆腐", "牛肉": "鸡肉", "青菜": "任意叶菜", "洋葱": "葱", "奶酪": "无乳奶酪", "面包": "馒头"]
         let normalizedIngredients = Set(ingredients.map { aliases[$0] ?? $0 })
         return RecipeCatalog.recipes
             .filter { recipe in
@@ -37,7 +38,8 @@ enum RecommendationEngine {
                     else if recentPenalty > 0 { "最近吃过，已降低排序" }
                     else if missing.isEmpty { "现有食材完全匹配" }
                     else { "只缺 \(missing.count) 种食材" }
-                return Recommendation(recipe: recipe, available: available, missing: missing, score: coverage - Double(missing.count) * 0.05 + ratingBonus - recentPenalty + Double(priorityCount) * 0.15, reason: reason)
+                let substitutions = missing.compactMap { ingredient in substitutes[ingredient].map { "\(ingredient)可换\($0)" } }
+                return Recommendation(recipe: recipe, available: available, missing: missing, score: coverage - Double(missing.count) * 0.05 + ratingBonus - recentPenalty + Double(priorityCount) * 0.15, reason: reason, substitutions: substitutions)
             }
             .sorted { lhs, rhs in
                 lhs.score == rhs.score ? lhs.recipe.minutes < rhs.recipe.minutes : lhs.score > rhs.score
