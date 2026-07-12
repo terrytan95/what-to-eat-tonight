@@ -52,6 +52,8 @@ final class AppState {
     var mealHistory: [MealRecord] = []
     var inventory: [InventoryItem] = []
     var shoppingList: [ShoppingItem] = []
+    var familyMembers: [FamilyMember] = []
+    var mealPlan: [MealPlanEntry] = []
     var recommendationFilters = RecommendationFilters()
     var servings = 2
 
@@ -94,6 +96,8 @@ final class AppState {
         mealHistory = (try? context.fetch(meals)) ?? []
         inventory = (try? context.fetch(FetchDescriptor<InventoryItem>(sortBy: [SortDescriptor(\.name)]))) ?? []
         shoppingList = (try? context.fetch(FetchDescriptor<ShoppingItem>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
+        familyMembers = (try? context.fetch(FetchDescriptor<FamilyMember>(sortBy: [SortDescriptor(\.name)]))) ?? []
+        mealPlan = (try? context.fetch(FetchDescriptor<MealPlanEntry>(sortBy: [SortDescriptor(\.date)]))) ?? []
     }
 
     func toggleFavorite(_ id: String) {
@@ -225,6 +229,53 @@ final class AppState {
         return "蔬菜及其他"
     }
 
+    func addFamilyMember(name: String, diets: Set<Diet>, exclusions: String) {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        let excluded = exclusions.components(separatedBy: CharacterSet(charactersIn: "、，,；;\n")).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        let member = FamilyMember(name: name, dietRawValues: diets.map(\.rawValue).sorted(), excludedIngredients: excluded)
+        context.insert(member)
+        familyMembers.append(member)
+        familyMembers.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        persist()
+    }
+
+    func deleteFamilyMember(_ member: FamilyMember) { familyMembers.removeAll { $0.id == member.id }; context.delete(member); persist() }
+
+    @discardableResult
+    func generateMealPlan(days: Int = 7, start: Date = .now) -> Bool {
+        let requiredDiets = Set(familyMembers.flatMap(\.dietRawValues).compactMap(Diet.init(rawValue:)))
+        let excludedIngredients = Set(familyMembers.flatMap(\.excludedIngredients))
+        let candidates = RecipeCatalog.recipes.filter {
+            $0.isEligible(maximumMinutes: maximumMinutes, diets: requiredDiets, excluding: disliked)
+                && excludedIngredients.isDisjoint(with: $0.ingredients)
+        }
+        guard !candidates.isEmpty else { return false }
+        mealPlan.forEach(context.delete)
+        mealPlan = (0..<max(1, min(days, 14))).map { offset in
+            let date = Calendar.current.date(byAdding: .day, value: offset, to: Calendar.current.startOfDay(for: start)) ?? start
+            let recipe = candidates[offset % candidates.count]
+            let entry = MealPlanEntry(date: date, recipeID: recipe.id, servings: max(servings, familyMembers.count))
+            context.insert(entry)
+            return entry
+        }
+        persist()
+        return true
+    }
+
+    func replaceMealPlanEntry(_ entry: MealPlanEntry) {
+        let currentIndex = RecipeCatalog.recipes.firstIndex { $0.id == entry.recipeID } ?? 0
+        let excluded = Set(familyMembers.flatMap(\.excludedIngredients))
+        let replacement = (1...RecipeCatalog.recipes.count).lazy.map { RecipeCatalog.recipes[(currentIndex + $0) % RecipeCatalog.recipes.count] }.first { recipe in
+            !excluded.contains(where: recipe.ingredients.contains) && !mealPlan.contains { $0.id != entry.id && $0.recipeID == recipe.id }
+        }
+        if let replacement { entry.recipeID = replacement.id; persist() }
+    }
+
+    func addMealPlanToShoppingList() {
+        mealPlan.compactMap { entry in RecipeCatalog.recipes.first { $0.id == entry.recipeID } }.forEach(addRecipeToShoppingList)
+    }
+
     func exportData() throws -> String {
         let meals = mealHistory.map { Archive.Meal(id: $0.id, recipeID: $0.recipeID, cookedAt: $0.cookedAt, rating: $0.rating, note: $0.note) }
         let inventory = inventory.map { Archive.Inventory(id: $0.id, name: $0.name, quantity: $0.quantity, unit: $0.unit, storage: $0.storage, purchasedAt: $0.purchasedAt, expiresAt: $0.expiresAt, isStaple: $0.isStaple, barcode: $0.barcode) }
@@ -282,9 +333,13 @@ final class AppState {
             try context.delete(model: MealRecord.self)
             try context.delete(model: InventoryItem.self)
             try context.delete(model: ShoppingItem.self)
+            try context.delete(model: FamilyMember.self)
+            try context.delete(model: MealPlanEntry.self)
             mealHistory = []
             inventory = []
             shoppingList = []
+            familyMembers = []
+            mealPlan = []
         } catch {
             assertionFailure("Unable to delete meal history: \(error.localizedDescription)")
         }

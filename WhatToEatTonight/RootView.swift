@@ -57,6 +57,9 @@ struct SettingsView: View {
                     Spacer()
                     Text("\(state.mealHistory.count)").foregroundStyle(.secondary)
                 }
+                NavigationLink { FamilyMealPlanView() } label: {
+                    Label("家庭与一周菜单", systemImage: "person.3")
+                }
             }
             Section {
                 Text("数据默认仅保存在这台设备上。开启云同步前不会上传。")

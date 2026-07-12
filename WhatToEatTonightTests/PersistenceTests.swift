@@ -39,5 +39,12 @@ struct PersistenceTests {
         #expect(state.shoppingList.map(\.name) == ["面包", "奶酪"])
         state.addShoppingItem(name: "面包")
         #expect(state.shoppingList.first { $0.name == "面包" }?.quantity == 2)
+
+        state.addFamilyMember(name: "A", diets: [.vegetarian], exclusions: "蘑菇")
+        #expect(state.generateMealPlan(days: 3))
+        #expect(state.mealPlan.count == 3)
+        #expect(state.mealPlan.allSatisfy { entry in
+            RecipeCatalog.recipes.first { $0.id == entry.recipeID }?.diets.contains(.vegetarian) == true
+        })
     }
 }
