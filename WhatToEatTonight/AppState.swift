@@ -41,6 +41,7 @@ final class AppState {
     var recentChoices: [String] = []
     var mealHistory: [MealRecord] = []
     var inventory: [InventoryItem] = []
+    var recommendationFilters = RecommendationFilters()
 
     private let context: ModelContext
     private let profile: UserProfile

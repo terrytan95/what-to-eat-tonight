@@ -35,6 +35,73 @@ enum DinnerMode: String, CaseIterable, Identifiable {
     var id: Self { self }
 }
 
+enum EffortLevel: Int, CaseIterable, Identifiable {
+    case minimal, easy, involved
+    var id: Self { self }
+    var title: String { ["完全不想动", "可以简单做", "愿意认真做"][rawValue] }
+}
+
+enum KitchenTool: String, CaseIterable, Identifiable {
+    case noFire = "无需开火", onePot = "一口锅", riceCooker = "电饭煲", microwave = "微波炉", airFryer = "空气炸锅"
+    var id: Self { self }
+}
+
+enum Cuisine: String, CaseIterable, Identifiable {
+    case chinese = "中餐", western = "西餐", japanese = "日料", korean = "韩餐", southeastAsian = "东南亚"
+    var id: Self { self }
+}
+
+enum MealOccasion: String, CaseIterable, Identifiable {
+    case weekday = "工作日晚餐", lateNight = "夜宵", fitness = "健身餐", lunchbox = "适合带饭", kids = "儿童餐", gathering = "朋友聚餐"
+    var id: Self { self }
+}
+
+enum NutritionGoal: String, CaseIterable, Identifiable {
+    case highProtein = "高蛋白", lowerCarb = "少主食", lighter = "清淡"
+    var id: Self { self }
+}
+
+enum WeatherMood: String, CaseIterable, Identifiable {
+    case cold = "冷天", hot = "炎热", rainy = "下雨"
+    var id: Self { self }
+}
+
+struct RecommendationFilters {
+    var effort: EffortLevel? = nil
+    var tool: KitchenTool? = nil
+    var cuisine: Cuisine? = nil
+    var occasion: MealOccasion? = nil
+    var nutrition: NutritionGoal? = nil
+    var weather: WeatherMood? = nil
+    var budgetPerPerson: Int? = nil
+
+    var isEmpty: Bool { effort == nil && tool == nil && cuisine == nil && occasion == nil && nutrition == nil && weather == nil && budgetPerPerson == nil }
+}
+
+struct RecipeAttributes {
+    let effort: EffortLevel
+    let tools: Set<KitchenTool>
+    let cuisine: Cuisine
+    let occasions: Set<MealOccasion>
+    let nutrition: Set<NutritionGoal>
+    let weather: Set<WeatherMood>
+    let estimatedCostPerPerson: Int
+}
+
+extension Recipe {
+    var attributes: RecipeAttributes {
+        switch id {
+        case "tomato-eggs": .init(effort: .minimal, tools: [.onePot], cuisine: .chinese, occasions: [.weekday, .kids], nutrition: [.lighter], weather: [.hot], estimatedCostPerPerson: 12)
+        case "fried-rice": .init(effort: .easy, tools: [.onePot], cuisine: .chinese, occasions: [.weekday, .lateNight, .lunchbox, .kids], nutrition: [], weather: [.rainy], estimatedCostPerPerson: 10)
+        case "chicken-potato": .init(effort: .involved, tools: [.onePot, .riceCooker], cuisine: .chinese, occasions: [.gathering, .lunchbox], nutrition: [.highProtein], weather: [.cold, .rainy], estimatedCostPerPerson: 24)
+        case "tofu-mushroom": .init(effort: .easy, tools: [.onePot], cuisine: .chinese, occasions: [.weekday, .fitness], nutrition: [.lighter, .lowerCarb], weather: [.hot], estimatedCostPerPerson: 16)
+        case "beef-noodles": .init(effort: .easy, tools: [.onePot], cuisine: .chinese, occasions: [.weekday, .lateNight], nutrition: [.highProtein], weather: [.cold, .rainy], estimatedCostPerPerson: 28)
+        case "shrimp-rice": .init(effort: .easy, tools: [.onePot, .riceCooker], cuisine: .chinese, occasions: [.fitness, .lunchbox], nutrition: [.highProtein], weather: [.hot], estimatedCostPerPerson: 26)
+        default: .init(effort: .minimal, tools: [.noFire, .airFryer], cuisine: .western, occasions: [.weekday, .lateNight, .kids], nutrition: [], weather: [.hot], estimatedCostPerPerson: 18)
+        }
+    }
+}
+
 struct DinnerChoice {
     let id: String
     let name: String

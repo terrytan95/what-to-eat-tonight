@@ -121,6 +121,7 @@ struct PantryView: View {
     @State private var customIngredient = ""
     @State private var showResults = false
     @State private var showInventory = false
+    @State private var showFilters = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var chipColumns: [GridItem] {
@@ -174,6 +175,14 @@ struct PantryView: View {
                     ForEach(Diet.allCases) { diet in dietButton(diet) }
                 }
 
+                Button { showFilters = true } label: {
+                    HStack {
+                        Label("更多筛选", systemImage: "line.3.horizontal.decrease.circle")
+                        Spacer()
+                        Text(state.recommendationFilters.isEmpty ? "不限" : "已设置").foregroundStyle(.secondary)
+                    }.frame(minHeight: 44)
+                }.appSecondaryButtonStyle()
+
                 Button { showResults = true } label: {
                     Text("看看能做什么").fontWeight(.semibold).frame(maxWidth: .infinity).frame(minHeight: 50)
                 }
@@ -187,6 +196,7 @@ struct PantryView: View {
         .navigationDestination(isPresented: $showResults) { ResultsView() }
         .navigationDestination(isPresented: $showInventory) { InventoryView() }
         .onAppear { state.selectedIngredients.formUnion(state.inventory.filter { $0.quantity > 0 }.map(\.name)) }
+        .sheet(isPresented: $showFilters) { RecommendationFiltersView() }
     }
 
     private func sectionTitle(_ title: String) -> some View { Text(title).font(.headline) }
@@ -225,7 +235,7 @@ struct PantryView: View {
 struct ResultsView: View {
     @Environment(AppState.self) private var state
     private var recommendations: [Recommendation] {
-        RecommendationEngine.recommendations(ingredients: state.selectedIngredients, maximumMinutes: state.maximumMinutes, diets: state.diets, excluding: state.disliked, ratings: state.ratings, recentIDs: state.recentChoices, priorityIngredients: state.expiringIngredients)
+        RecommendationEngine.recommendations(ingredients: state.selectedIngredients, maximumMinutes: state.maximumMinutes, diets: state.diets, excluding: state.disliked, ratings: state.ratings, recentIDs: state.recentChoices, priorityIngredients: state.expiringIngredients, filters: state.recommendationFilters)
     }
 
     var body: some View {

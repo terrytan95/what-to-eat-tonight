@@ -8,12 +8,23 @@ enum RecommendationEngine {
         excluding excludedIDs: Set<String> = [],
         ratings: [String: Int] = [:],
         recentIDs: [String] = [],
-        priorityIngredients: Set<String> = []
+        priorityIngredients: Set<String> = [],
+        filters: RecommendationFilters = .init()
     ) -> [Recommendation] {
         let aliases = ["西红柿": "番茄", "洋芋": "土豆", "马铃薯": "土豆", "大虾": "虾"]
         let normalizedIngredients = Set(ingredients.map { aliases[$0] ?? $0 })
         return RecipeCatalog.recipes
-            .filter { $0.isEligible(maximumMinutes: maximumMinutes, diets: diets, excluding: excludedIDs) }
+            .filter { recipe in
+                let attributes = recipe.attributes
+                return recipe.isEligible(maximumMinutes: maximumMinutes, diets: diets, excluding: excludedIDs)
+                    && filters.effort.map { attributes.effort.rawValue <= $0.rawValue } != false
+                    && filters.tool.map(attributes.tools.contains) != false
+                    && filters.cuisine.map { attributes.cuisine == $0 } != false
+                    && filters.occasion.map(attributes.occasions.contains) != false
+                    && filters.nutrition.map(attributes.nutrition.contains) != false
+                    && filters.weather.map(attributes.weather.contains) != false
+                    && filters.budgetPerPerson.map { attributes.estimatedCostPerPerson <= $0 } != false
+            }
             .map { recipe in
                 let available = recipe.ingredients.filter(normalizedIngredients.contains)
                 let missing = recipe.ingredients.filter { !normalizedIngredients.contains($0) }

@@ -48,4 +48,10 @@ struct RecommendationEngineTests {
         #expect(results.first?.recipe.id == "cheese-toast")
         #expect(results.first?.reason.contains("临期食材") == true)
     }
+
+    @Test func appliesAdvancedFiltersTogether() {
+        let filters = RecommendationFilters(effort: .easy, tool: .onePot, cuisine: .chinese, occasion: .fitness, nutrition: .lowerCarb, weather: .hot, budgetPerPerson: 20)
+        let results = RecommendationEngine.recommendations(ingredients: ["豆腐", "蘑菇", "青菜"], maximumMinutes: 30, diets: [.vegetarian], filters: filters)
+        #expect(results.map(\.recipe.id) == ["tofu-mushroom"])
+    }
 }
