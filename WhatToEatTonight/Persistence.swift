@@ -38,6 +38,29 @@ final class MealRecord {
     }
 }
 
+@Model
+final class InventoryItem {
+    @Attribute(.unique) var id: UUID
+    var name: String
+    var quantity: Double
+    var unit: String
+    var storage: String
+    var purchasedAt: Date
+    var expiresAt: Date?
+    var isStaple: Bool
+
+    init(id: UUID = UUID(), name: String, quantity: Double = 1, unit: String = "份", storage: String = "冷藏", purchasedAt: Date = .now, expiresAt: Date? = nil, isStaple: Bool = false) {
+        self.id = id
+        self.name = name
+        self.quantity = quantity
+        self.unit = unit
+        self.storage = storage
+        self.purchasedAt = purchasedAt
+        self.expiresAt = expiresAt
+        self.isStaple = isStaple
+    }
+}
+
 @MainActor
 final class PersistenceController {
     let container: ModelContainer
@@ -45,7 +68,7 @@ final class PersistenceController {
     init(inMemory: Bool = false) {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: inMemory)
         do {
-            container = try ModelContainer(for: UserProfile.self, MealRecord.self, configurations: configuration)
+            container = try ModelContainer(for: UserProfile.self, MealRecord.self, InventoryItem.self, configurations: configuration)
         } catch {
             fatalError("Unable to initialize local storage: \(error.localizedDescription)")
         }

@@ -120,6 +120,7 @@ struct PantryView: View {
     @Environment(AppState.self) private var state
     @State private var customIngredient = ""
     @State private var showResults = false
+    @State private var showInventory = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var chipColumns: [GridItem] {
@@ -133,6 +134,14 @@ struct PantryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 ScreenHeader(title: "冰箱里有什么？", subtitle: "选择你有的食材和偏好，看看能做什么")
+                Button { showInventory = true } label: {
+                    HStack {
+                        Label("管理冰箱库存", systemImage: "refrigerator.fill")
+                        Spacer()
+                        Text("\(state.inventory.filter { $0.quantity > 0 }.count) 项").foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+                    }.appCard(padding: 14)
+                }.buttonStyle(.plain)
 
                 sectionTitle("常见食材")
                 LazyVGrid(columns: chipColumns, spacing: 10) {
@@ -176,6 +185,8 @@ struct PantryView: View {
         .background(AppTheme.background)
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showResults) { ResultsView() }
+        .navigationDestination(isPresented: $showInventory) { InventoryView() }
+        .onAppear { state.selectedIngredients.formUnion(state.inventory.filter { $0.quantity > 0 }.map(\.name)) }
     }
 
     private func sectionTitle(_ title: String) -> some View { Text(title).font(.headline) }
@@ -214,7 +225,7 @@ struct PantryView: View {
 struct ResultsView: View {
     @Environment(AppState.self) private var state
     private var recommendations: [Recommendation] {
-        RecommendationEngine.recommendations(ingredients: state.selectedIngredients, maximumMinutes: state.maximumMinutes, diets: state.diets, excluding: state.disliked, ratings: state.ratings, recentIDs: state.recentChoices)
+        RecommendationEngine.recommendations(ingredients: state.selectedIngredients, maximumMinutes: state.maximumMinutes, diets: state.diets, excluding: state.disliked, ratings: state.ratings, recentIDs: state.recentChoices, priorityIngredients: state.expiringIngredients)
     }
 
     var body: some View {

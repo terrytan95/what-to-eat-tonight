@@ -13,12 +13,23 @@ final class AppState {
             let rating: Int
             let note: String
         }
+        struct Inventory: Codable {
+            let id: UUID
+            let name: String
+            let quantity: Double
+            let unit: String
+            let storage: String
+            let purchasedAt: Date
+            let expiresAt: Date?
+            let isStaple: Bool
+        }
 
         let version: Int
         let favorites: [String]
         let disliked: [String]
         let recentChoices: [String]
         let meals: [Meal]?
+        let inventory: [Inventory]?
     }
 
     var selectedIngredients: Set<String> = []
@@ -28,6 +39,7 @@ final class AppState {
     var disliked: Set<String> = []
     var recentChoices: [String] = []
     var mealHistory: [MealRecord] = []
+    var inventory: [InventoryItem] = []
 
     private let context: ModelContext
     private let profile: UserProfile
@@ -66,6 +78,7 @@ final class AppState {
         recentChoices = profile.recentRecipeIDs
         let meals = FetchDescriptor<MealRecord>(sortBy: [SortDescriptor(\.cookedAt, order: .reverse)])
         mealHistory = (try? context.fetch(meals)) ?? []
+        inventory = (try? context.fetch(FetchDescriptor<InventoryItem>(sortBy: [SortDescriptor(\.name)]))) ?? []
     }
 
     func toggleFavorite(_ id: String) {
@@ -105,9 +118,39 @@ final class AppState {
         Dictionary(mealHistory.reversed().map { ($0.recipeID, $0.rating) }, uniquingKeysWith: { _, latest in latest })
     }
 
+    var expiringIngredients: Set<String> {
+        let deadline = Calendar.current.date(byAdding: .day, value: 3, to: .now) ?? .now
+        return Set(inventory.filter { $0.quantity > 0 && $0.expiresAt.map { $0 <= deadline } == true }.map(\.name))
+    }
+
+    func addInventory(name: String, quantity: Double, unit: String, storage: String, expiresAt: Date?, isStaple: Bool) {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, quantity > 0 else { return }
+        let item = InventoryItem(name: name, quantity: quantity, unit: unit, storage: storage, expiresAt: expiresAt, isStaple: isStaple)
+        context.insert(item)
+        inventory.append(item)
+        inventory.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        selectedIngredients.insert(name)
+        persist()
+    }
+
+    func deleteInventory(_ item: InventoryItem) {
+        inventory.removeAll { $0.id == item.id }
+        context.delete(item)
+        if !inventory.contains(where: { $0.name == item.name && $0.quantity > 0 }) { selectedIngredients.remove(item.name) }
+        persist()
+    }
+
+    func consume(_ item: InventoryItem, amount: Double = 1) {
+        item.quantity = max(0, item.quantity - amount)
+        if item.quantity == 0 { selectedIngredients.remove(item.name) }
+        persist()
+    }
+
     func exportData() throws -> String {
         let meals = mealHistory.map { Archive.Meal(id: $0.id, recipeID: $0.recipeID, cookedAt: $0.cookedAt, rating: $0.rating, note: $0.note) }
-        let archive = Archive(version: 1, favorites: favorites.sorted(), disliked: disliked.sorted(), recentChoices: recentChoices, meals: meals)
+        let inventory = inventory.map { Archive.Inventory(id: $0.id, name: $0.name, quantity: $0.quantity, unit: $0.unit, storage: $0.storage, purchasedAt: $0.purchasedAt, expiresAt: $0.expiresAt, isStaple: $0.isStaple) }
+        let archive = Archive(version: 1, favorites: favorites.sorted(), disliked: disliked.sorted(), recentChoices: recentChoices, meals: meals, inventory: inventory)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         return String(decoding: try encoder.encode(archive), as: UTF8.self)
@@ -118,7 +161,9 @@ final class AppState {
         let archive = try JSONDecoder().decode(Archive.self, from: Data(text.utf8))
         guard archive.version == 1,
               (archive.meals?.count ?? 0) <= 10_000,
-              archive.meals?.allSatisfy({ !$0.recipeID.isEmpty && (0...2).contains($0.rating) }) != false
+              archive.meals?.allSatisfy({ !$0.recipeID.isEmpty && (0...2).contains($0.rating) }) != false,
+              (archive.inventory?.count ?? 0) <= 10_000,
+              archive.inventory?.allSatisfy({ !$0.name.isEmpty && $0.quantity >= 0 }) != false
         else { throw CocoaError(.coderReadCorrupt) }
         favorites = Set(archive.favorites)
         disliked = Set(archive.disliked)
@@ -132,6 +177,12 @@ final class AppState {
             context.insert(record)
             return record
         }.sorted { $0.cookedAt > $1.cookedAt }
+        try context.delete(model: InventoryItem.self)
+        inventory = (archive.inventory ?? []).map {
+            let item = InventoryItem(id: $0.id, name: $0.name, quantity: $0.quantity, unit: $0.unit, storage: $0.storage, purchasedAt: $0.purchasedAt, expiresAt: $0.expiresAt, isStaple: $0.isStaple)
+            context.insert(item)
+            return item
+        }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         try context.save()
     }
 
@@ -144,7 +195,9 @@ final class AppState {
         profile.recentRecipeIDs = []
         do {
             try context.delete(model: MealRecord.self)
+            try context.delete(model: InventoryItem.self)
             mealHistory = []
+            inventory = []
         } catch {
             assertionFailure("Unable to delete meal history: \(error.localizedDescription)")
         }

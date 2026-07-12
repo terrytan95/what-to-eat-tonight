@@ -37,4 +37,15 @@ struct RecommendationEngineTests {
         #expect(results.first?.recipe.id == "cheese-toast")
         #expect(results.first?.reason == "你上次觉得很好吃")
     }
+
+    @Test func prioritizesRecipesThatUseExpiringIngredients() {
+        let results = RecommendationEngine.recommendations(
+            ingredients: ["番茄", "鸡蛋", "面包", "奶酪"],
+            maximumMinutes: 20,
+            diets: [.vegetarian],
+            priorityIngredients: ["奶酪"]
+        )
+        #expect(results.first?.recipe.id == "cheese-toast")
+        #expect(results.first?.reason.contains("临期食材") == true)
+    }
 }
