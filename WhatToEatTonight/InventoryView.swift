@@ -3,6 +3,7 @@ import SwiftUI
 struct InventoryView: View {
     @Environment(AppState.self) private var state
     @State private var showAdd = false
+    @State private var showBatch = false
 
     var body: some View {
         List {
@@ -32,8 +33,45 @@ struct InventoryView: View {
         }
         .overlay { if state.inventory.isEmpty { ContentUnavailableView("冰箱还是空的", systemImage: "refrigerator", description: Text("添加食材后会自动参与推荐。")) } }
         .navigationTitle("冰箱库存")
-        .toolbar { Button("添加", systemImage: "plus") { showAdd = true } }
+        .toolbar {
+            Menu("添加", systemImage: "plus") {
+                Button("手动添加", systemImage: "square.and.pencil") { showAdd = true }
+                Button("批量粘贴", systemImage: "doc.on.clipboard") { showBatch = true }
+                Menu("常备模板") {
+                    Button("家常基础") { state.addInventory(text: "鸡蛋、番茄、米饭、面条、土豆、洋葱、青菜") }
+                    Button("健身餐") { state.addInventory(text: "鸡蛋、鸡肉、米饭、青菜、虾") }
+                    Button("宿舍快手") { state.addInventory(text: "鸡蛋、面条、面包、奶酪") }
+                }
+            }
+        }
         .sheet(isPresented: $showAdd) { AddInventoryView() }
+        .sheet(isPresented: $showBatch) { BatchInventoryView() }
+    }
+}
+
+private struct BatchInventoryView: View {
+    @Environment(AppState.self) private var state
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    @State private var storage = "冷藏"
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextEditor(text: $text).frame(minHeight: 180)
+                Text("支持换行、顿号、逗号或分号分隔，最多导入 100 项。")
+                    .font(.footnote).foregroundStyle(.secondary)
+                Picker("存放位置", selection: $storage) { ForEach(["冷藏", "冷冻", "常温"], id: \.self) { Text($0) } }
+            }
+            .navigationTitle("批量添加")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("添加") { state.addInventory(text: text, storage: storage); dismiss() }
+                        .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
     }
 }
 

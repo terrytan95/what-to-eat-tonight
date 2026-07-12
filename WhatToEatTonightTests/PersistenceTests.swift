@@ -30,5 +30,9 @@ struct PersistenceTests {
         #expect(state.favorites.isEmpty)
         try state.importData(exported)
         #expect(state.favorites == ["fried-rice", "tomato-eggs"])
+
+        state.addInventory(text: "鸡蛋、番茄\n鸡蛋")
+        #expect(state.inventory.count == 2)
+        #expect(state.inventory.first { $0.name == "鸡蛋" }?.quantity == 2)
     }
 }

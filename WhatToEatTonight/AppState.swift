@@ -126,12 +126,26 @@ final class AppState {
     func addInventory(name: String, quantity: Double, unit: String, storage: String, expiresAt: Date?, isStaple: Bool) {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, quantity > 0 else { return }
+        if expiresAt == nil, let existing = inventory.first(where: { $0.name == name && $0.unit == unit && $0.storage == storage && $0.expiresAt == nil }) {
+            existing.quantity += quantity
+            existing.isStaple = existing.isStaple || isStaple
+            selectedIngredients.insert(name)
+            persist()
+            return
+        }
         let item = InventoryItem(name: name, quantity: quantity, unit: unit, storage: storage, expiresAt: expiresAt, isStaple: isStaple)
         context.insert(item)
         inventory.append(item)
         inventory.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         selectedIngredients.insert(name)
         persist()
+    }
+
+    func addInventory(text: String, storage: String = "冷藏") {
+        text.components(separatedBy: CharacterSet(charactersIn: "、，,；;\n"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }.prefix(100)
+            .forEach { addInventory(name: $0, quantity: 1, unit: "份", storage: storage, expiresAt: nil, isStaple: false) }
     }
 
     func deleteInventory(_ item: InventoryItem) {
