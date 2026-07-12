@@ -10,6 +10,11 @@
 	<key>CFBundlePackageType</key><string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array><dict>
+		<key>CFBundleURLName</key><string>com.terrytan.WhatToEatTonight</string>
+		<key>CFBundleURLSchemes</key><array><string>wteat</string></array>
+	</dict></array>
 	<key>LSApplicationCategoryType</key><string>public.app-category.food-and-drink</string>
 	<key>NSBonjourServices</key><array><string>_wteat-room._tcp.</string></array>
 	<key>NSLocalNetworkUsageDescription</key><string>用于发现附近的共同选餐房间。</string>

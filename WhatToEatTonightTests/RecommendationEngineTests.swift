@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import WhatToEatTonight
 
@@ -75,5 +76,19 @@ struct RecommendationEngineTests {
         #expect(abs(two.protein - one.protein * 2) < 0.001)
         #expect(abs(two.calories - one.calories * 2) < 0.001)
         #expect(NutritionEstimator.matches(.lighter, recipe: RecipeCatalog.recipes[0]))
+    }
+
+    @Test func parsesValidatedAppLinks() {
+        guard case .recipe(let recipe) = DeepLink(url: URL(string: "wteat://recipe/tomato-eggs")!) else {
+            Issue.record("Expected a recipe deep link")
+            return
+        }
+        #expect(recipe.id == "tomato-eggs")
+        guard case .room(let code) = DeepLink(url: URL(string: "wteat://room/123456")!) else {
+            Issue.record("Expected a room deep link")
+            return
+        }
+        #expect(code == "123456")
+        #expect(DeepLink(url: URL(string: "wteat://room/123")!) == nil)
     }
 }

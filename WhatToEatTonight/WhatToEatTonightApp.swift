@@ -10,6 +10,7 @@ struct WhatToEatTonightApp: App {
         let persistence = PersistenceController()
         self.persistence = persistence
         _appState = State(initialValue: AppState(context: persistence.container.mainContext))
+        RecipeSearchIndexer.index()
     }
 
     var body: some Scene {

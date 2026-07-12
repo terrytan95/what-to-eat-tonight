@@ -2,6 +2,7 @@ import CoreImage.CIFilterBuiltins
 import SwiftUI
 
 struct RootView: View {
+    @State private var deepLink: DeepLink?
     #if DEBUG
     private var demoScreen: DemoScreen? {
         if let value = ProcessInfo.processInfo.environment["DEMO_SCREEN"] { return DemoScreen(rawValue: value) }
@@ -32,6 +33,15 @@ struct RootView: View {
             Tab("设置", systemImage: "gearshape.fill") { NavigationStack { SettingsView() } }
         }
         .tint(AppTheme.orange)
+        .onOpenURL { deepLink = DeepLink(url: $0) }
+        .sheet(item: $deepLink) { link in
+            NavigationStack {
+                switch link {
+                case .recipe(let recipe): RecipeDetailView(recipe: recipe)
+                case .room(let code): TogetherView(initialCode: code)
+                }
+            }
+        }
     }
 }
 
@@ -59,6 +69,11 @@ struct SettingsView: View {
                 }
                 NavigationLink { FamilyMealPlanView() } label: {
                     Label("家庭与一周菜单", systemImage: "person.3")
+                }
+            }
+            Section("提醒") {
+                NavigationLink { ReminderSettingsView() } label: {
+                    Label("晚餐提醒", systemImage: "bell")
                 }
             }
             Section {
@@ -410,6 +425,8 @@ struct TogetherView: View {
     @State private var enteredCode = ""
     @State private var showVoting = false
     @State private var showDuel = false
+
+    init(initialCode: String = "") { _enteredCode = State(initialValue: initialCode) }
 
     var body: some View {
         VStack(spacing: 24) {

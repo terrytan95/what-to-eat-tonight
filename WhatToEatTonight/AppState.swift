@@ -162,6 +162,7 @@ final class AppState {
         inventory.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         selectedIngredients.insert(name)
         persist()
+        if item.expiresAt != nil { Task { await AppNotifications.scheduleExpiry(for: item) } }
     }
 
     func addKnownBarcode(_ barcode: String) -> Bool {
@@ -299,9 +300,15 @@ final class AppState {
         context.insert(timer)
         cookingTimers.append(timer)
         persist()
+        Task { await AppNotifications.scheduleTimer(timer) }
     }
 
-    func deleteCookingTimer(_ timer: CookingTimer) { cookingTimers.removeAll { $0.id == timer.id }; context.delete(timer); persist() }
+    func deleteCookingTimer(_ timer: CookingTimer) {
+        AppNotifications.cancelTimer(timer)
+        cookingTimers.removeAll { $0.id == timer.id }
+        context.delete(timer)
+        persist()
+    }
 
     func finishCooking(_ session: CookingSession, recipe: Recipe, rating: Int, note: String, consumeInventory: Bool) {
         cookingTimers.filter { $0.recipeID == recipe.id }.forEach(deleteCookingTimer)
