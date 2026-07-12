@@ -25,6 +25,7 @@ struct Recommendation: Identifiable {
     let available: [String]
     let missing: [String]
     let score: Double
+    let reason: String
     var id: String { recipe.id }
 }
 

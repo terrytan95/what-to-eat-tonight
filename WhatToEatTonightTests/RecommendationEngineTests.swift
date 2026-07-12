@@ -25,4 +25,16 @@ struct RecommendationEngineTests {
         #expect(results.first?.recipe.id == "tomato-eggs")
         #expect(results.first?.missing.isEmpty == true)
     }
+
+    @Test func feedbackAndRecencyAffectRankingReason() {
+        let results = RecommendationEngine.recommendations(
+            ingredients: ["番茄", "鸡蛋", "面包", "奶酪"],
+            maximumMinutes: 20,
+            diets: [.vegetarian],
+            ratings: ["cheese-toast": 2],
+            recentIDs: ["tomato-eggs"]
+        )
+        #expect(results.first?.recipe.id == "cheese-toast")
+        #expect(results.first?.reason == "你上次觉得很好吃")
+    }
 }

@@ -50,6 +50,13 @@ struct SettingsView: View {
                 Button { showImporter = true } label: { Label("导入数据", systemImage: "square.and.arrow.down") }
                 Button("删除全部数据", systemImage: "trash", role: .destructive) { showDeleteConfirmation = true }
             }
+            Section("记录") {
+                NavigationLink { MealHistoryView() } label: {
+                    Label("饮食日历", systemImage: "calendar")
+                    Spacer()
+                    Text("\(state.mealHistory.count)").foregroundStyle(.secondary)
+                }
+            }
             Section {
                 Text("数据默认仅保存在这台设备上。开启云同步前不会上传。")
             }.font(.footnote).foregroundStyle(.secondary)
@@ -81,6 +88,31 @@ struct SettingsView: View {
         .alert("WhatToEatTonight", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("好") { message = nil }
         } message: { Text(message ?? "") }
+    }
+}
+
+struct MealHistoryView: View {
+    @Environment(AppState.self) private var state
+
+    var body: some View {
+        List(state.mealHistory) { record in
+            let recipe = RecipeCatalog.recipes.first { $0.id == record.recipeID }
+            HStack(spacing: 12) {
+                Text(recipe?.emoji ?? "🍽️").font(.title2)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(recipe?.name ?? record.recipeID).font(.headline)
+                    Text(record.cookedAt, format: .dateTime.year().month().day().hour().minute())
+                        .font(.caption).foregroundStyle(.secondary)
+                    if !record.note.isEmpty { Text(record.note).font(.caption) }
+                }
+                Spacer()
+                Text(["不喜欢", "一般", "很好吃"][record.rating])
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(record.rating == 2 ? AppTheme.green : record.rating == 0 ? AppTheme.pink : .secondary)
+            }
+        }
+        .overlay { if state.mealHistory.isEmpty { ContentUnavailableView("还没有饮食记录", systemImage: "calendar", description: Text("在菜谱详情点击“吃过了”即可记录。")) } }
+        .navigationTitle("饮食日历")
     }
 }
 
@@ -182,7 +214,7 @@ struct PantryView: View {
 struct ResultsView: View {
     @Environment(AppState.self) private var state
     private var recommendations: [Recommendation] {
-        RecommendationEngine.recommendations(ingredients: state.selectedIngredients, maximumMinutes: state.maximumMinutes, diets: state.diets, excluding: state.disliked)
+        RecommendationEngine.recommendations(ingredients: state.selectedIngredients, maximumMinutes: state.maximumMinutes, diets: state.diets, excluding: state.disliked, ratings: state.ratings, recentIDs: state.recentChoices)
     }
 
     var body: some View {
@@ -200,6 +232,7 @@ struct ResultsView: View {
                                 }.font(.caption).foregroundStyle(.secondary)
                                 Text(result.missing.isEmpty ? "完全匹配" : "缺 \(result.missing.joined(separator: "、"))")
                                     .font(.caption.weight(.medium)).foregroundStyle(result.missing.isEmpty ? AppTheme.green : AppTheme.orange)
+                                Text(result.reason).font(.caption2).foregroundStyle(.secondary)
                             }
                             Spacer(); Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
                         }
@@ -219,6 +252,8 @@ struct ResultsView: View {
 struct RecipeDetailView: View {
     @Environment(AppState.self) private var state
     let recipe: Recipe
+    @State private var showRating = false
+    @State private var privateEntry = false
 
     var body: some View {
         ScrollView {
@@ -244,6 +279,7 @@ struct RecipeDetailView: View {
                         Text(step).font(.body).fixedSize(horizontal: false, vertical: true)
                     }
                 }
+                Toggle("本次不记录到饮食历史", isOn: $privateEntry).font(.footnote)
             }.padding(20).padding(.bottom, 86)
         }
         .background(AppTheme.background)
@@ -252,8 +288,14 @@ struct RecipeDetailView: View {
             HStack(spacing: 12) {
                 Button { state.toggleFavorite(recipe.id) } label: { Label(state.favorites.contains(recipe.id) ? "已收藏" : "收藏", systemImage: state.favorites.contains(recipe.id) ? "heart.fill" : "heart").frame(maxWidth: .infinity).frame(minHeight: 44) }
                 Button { state.dislike(recipe.id) } label: { Label("不喜欢", systemImage: "hand.thumbsdown").frame(maxWidth: .infinity).frame(minHeight: 44) }
+                Button { showRating = true } label: { Label("吃过了", systemImage: "checkmark.circle").frame(maxWidth: .infinity).frame(minHeight: 44) }
             }
             .fontWeight(.medium).padding(10).appGlassControl().padding(.horizontal)
+        }
+        .confirmationDialog("这道菜怎么样？", isPresented: $showRating, titleVisibility: .visible) {
+            Button("很好吃") { state.recordMeal(recipe.id, rating: 2, privateEntry: privateEntry) }
+            Button("一般") { state.recordMeal(recipe.id, rating: 1, privateEntry: privateEntry) }
+            Button("不喜欢") { state.recordMeal(recipe.id, rating: 0, privateEntry: privateEntry) }
         }
     }
 }
