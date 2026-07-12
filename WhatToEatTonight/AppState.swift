@@ -54,6 +54,8 @@ final class AppState {
     var shoppingList: [ShoppingItem] = []
     var familyMembers: [FamilyMember] = []
     var mealPlan: [MealPlanEntry] = []
+    var cookingSessions: [CookingSession] = []
+    var cookingTimers: [CookingTimer] = []
     var recommendationFilters = RecommendationFilters()
     var servings = 2
 
@@ -98,6 +100,8 @@ final class AppState {
         shoppingList = (try? context.fetch(FetchDescriptor<ShoppingItem>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
         familyMembers = (try? context.fetch(FetchDescriptor<FamilyMember>(sortBy: [SortDescriptor(\.name)]))) ?? []
         mealPlan = (try? context.fetch(FetchDescriptor<MealPlanEntry>(sortBy: [SortDescriptor(\.date)]))) ?? []
+        cookingSessions = (try? context.fetch(FetchDescriptor<CookingSession>())) ?? []
+        cookingTimers = (try? context.fetch(FetchDescriptor<CookingTimer>(sortBy: [SortDescriptor(\.endDate)]))) ?? []
     }
 
     func toggleFavorite(_ id: String) {
@@ -276,6 +280,37 @@ final class AppState {
         mealPlan.compactMap { entry in RecipeCatalog.recipes.first { $0.id == entry.recipeID } }.forEach(addRecipeToShoppingList)
     }
 
+    func cookingSession(for recipeID: String) -> CookingSession {
+        if let session = cookingSessions.first(where: { $0.recipeID == recipeID }) { return session }
+        let session = CookingSession(recipeID: recipeID)
+        context.insert(session)
+        cookingSessions.append(session)
+        persist()
+        return session
+    }
+
+    func moveCookingStep(_ session: CookingSession, to step: Int, stepCount: Int) {
+        session.currentStep = min(max(0, step), max(0, stepCount - 1))
+        persist()
+    }
+
+    func addCookingTimer(recipeID: String, minutes: Int) {
+        let timer = CookingTimer(recipeID: recipeID, label: "\(minutes) 分钟", endDate: Date.now.addingTimeInterval(TimeInterval(minutes * 60)))
+        context.insert(timer)
+        cookingTimers.append(timer)
+        persist()
+    }
+
+    func deleteCookingTimer(_ timer: CookingTimer) { cookingTimers.removeAll { $0.id == timer.id }; context.delete(timer); persist() }
+
+    func finishCooking(_ session: CookingSession, recipe: Recipe, rating: Int, note: String, consumeInventory: Bool) {
+        cookingTimers.filter { $0.recipeID == recipe.id }.forEach(deleteCookingTimer)
+        cookingSessions.removeAll { $0.id == session.id }
+        context.delete(session)
+        recordMeal(recipe.id, rating: rating, note: note)
+        if consumeInventory { consumeIngredients(recipe.ingredients) }
+    }
+
     func exportData() throws -> String {
         let meals = mealHistory.map { Archive.Meal(id: $0.id, recipeID: $0.recipeID, cookedAt: $0.cookedAt, rating: $0.rating, note: $0.note) }
         let inventory = inventory.map { Archive.Inventory(id: $0.id, name: $0.name, quantity: $0.quantity, unit: $0.unit, storage: $0.storage, purchasedAt: $0.purchasedAt, expiresAt: $0.expiresAt, isStaple: $0.isStaple, barcode: $0.barcode) }
@@ -335,11 +370,15 @@ final class AppState {
             try context.delete(model: ShoppingItem.self)
             try context.delete(model: FamilyMember.self)
             try context.delete(model: MealPlanEntry.self)
+            try context.delete(model: CookingSession.self)
+            try context.delete(model: CookingTimer.self)
             mealHistory = []
             inventory = []
             shoppingList = []
             familyMembers = []
             mealPlan = []
+            cookingSessions = []
+            cookingTimers = []
         } catch {
             assertionFailure("Unable to delete meal history: \(error.localizedDescription)")
         }

@@ -114,6 +114,36 @@ final class MealPlanEntry {
     }
 }
 
+@Model
+final class CookingSession {
+    @Attribute(.unique) var id: UUID
+    var recipeID: String
+    var currentStep: Int
+    var startedAt: Date
+
+    init(id: UUID = UUID(), recipeID: String, currentStep: Int = 0, startedAt: Date = .now) {
+        self.id = id
+        self.recipeID = recipeID
+        self.currentStep = currentStep
+        self.startedAt = startedAt
+    }
+}
+
+@Model
+final class CookingTimer {
+    @Attribute(.unique) var id: UUID
+    var recipeID: String
+    var label: String
+    var endDate: Date
+
+    init(id: UUID = UUID(), recipeID: String, label: String, endDate: Date) {
+        self.id = id
+        self.recipeID = recipeID
+        self.label = label
+        self.endDate = endDate
+    }
+}
+
 @MainActor
 final class PersistenceController {
     let container: ModelContainer
@@ -121,7 +151,7 @@ final class PersistenceController {
     init(inMemory: Bool = false) {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: inMemory)
         do {
-            container = try ModelContainer(for: UserProfile.self, MealRecord.self, InventoryItem.self, ShoppingItem.self, FamilyMember.self, MealPlanEntry.self, configurations: configuration)
+            container = try ModelContainer(for: UserProfile.self, MealRecord.self, InventoryItem.self, ShoppingItem.self, FamilyMember.self, MealPlanEntry.self, CookingSession.self, CookingTimer.self, configurations: configuration)
         } catch {
             fatalError("Unable to initialize local storage: \(error.localizedDescription)")
         }

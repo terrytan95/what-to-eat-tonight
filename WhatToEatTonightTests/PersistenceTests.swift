@@ -46,5 +46,11 @@ struct PersistenceTests {
         #expect(state.mealPlan.allSatisfy { entry in
             RecipeCatalog.recipes.first { $0.id == entry.recipeID }?.diets.contains(.vegetarian) == true
         })
+
+        let session = state.cookingSession(for: "tomato-eggs")
+        state.moveCookingStep(session, to: 2, stepCount: 3)
+        state.addCookingTimer(recipeID: "tomato-eggs", minutes: 5)
+        #expect(session.currentStep == 2)
+        #expect(state.cookingTimers.count == 1)
     }
 }

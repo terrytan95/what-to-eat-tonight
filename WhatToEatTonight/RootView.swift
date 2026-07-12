@@ -305,6 +305,9 @@ struct RecipeDetailView: View {
                 } label: {
                     Label(shoppingAdded ? "已加入购物清单" : "把缺少食材加入购物清单", systemImage: shoppingAdded ? "checkmark" : "cart.badge.plus")
                 }.disabled(shoppingAdded)
+                NavigationLink { CookingModeView(recipe: recipe) } label: {
+                    Label("开始分步烹饪", systemImage: "frying.pan.fill").frame(maxWidth: .infinity).frame(minHeight: 46)
+                }.appPrimaryButtonStyle().tint(AppTheme.orange)
                 Divider()
                 Text("步骤").font(.headline)
                 ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, step in
