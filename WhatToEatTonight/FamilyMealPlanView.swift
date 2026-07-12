@@ -28,6 +28,11 @@ struct FamilyMealPlanView: View {
                             VStack(alignment: .leading) {
                                 Text(entry.date, format: .dateTime.weekday(.wide).month().day()).font(.caption).foregroundStyle(.secondary)
                                 Text("\(recipe?.emoji ?? "🍽️")  \(recipe?.name ?? entry.recipeID)").font(.headline)
+                                if let recipe {
+                                    let nutrients = NutritionEstimator.estimate(recipe: recipe, servings: 1)
+                                    Text("每人约 \(nutrients.calories.formatted(.number.precision(.fractionLength(0)))) kcal · 蛋白质 \(nutrients.protein.formatted(.number.precision(.fractionLength(0))))g")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                }
                             }
                             Spacer()
                             Button { state.replaceMealPlanEntry(entry) } label: { Image(systemName: "arrow.triangle.2.circlepath") }.accessibilityLabel("替换这一天")

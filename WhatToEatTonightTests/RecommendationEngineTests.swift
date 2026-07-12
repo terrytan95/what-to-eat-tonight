@@ -78,6 +78,16 @@ struct RecommendationEngineTests {
         #expect(NutritionEstimator.matches(.lighter, recipe: RecipeCatalog.recipes[0]))
     }
 
+    @Test func nutritionUsesGramsAndRejectsUnsupportedWeights() {
+        let nutrients = NutritionEstimator.estimate(ingredientWeights: ["鸡蛋": 100, "番茄": 200, "未知食材": 500, "米饭": -20])
+        #expect(abs(nutrients.protein - 14.32) < 0.01)
+        #expect(abs(nutrients.fat - 9.91) < 0.01)
+        #expect(abs(nutrients.carbohydrates - 8.5) < 0.01)
+        #expect(abs(nutrients.calories - 179) < 0.01)
+        #expect(Set(RecipeCatalog.ingredients).isSubset(of: NutritionEstimator.supportedIngredients))
+        #expect(NutritionEstimator.sourceURL.host == "fdc.nal.usda.gov")
+    }
+
     @Test func parsesValidatedAppLinks() {
         guard case .recipe(let recipe) = DeepLink(url: URL(string: "wteat://recipe/tomato-eggs")!) else {
             Issue.record("Expected a recipe deep link")

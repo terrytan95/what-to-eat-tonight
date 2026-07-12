@@ -65,6 +65,8 @@ enum NutritionEstimator {
         "面包": .init(protein: 8.85, fat: 3.33, carbohydrates: 49.42, calories: 266)
     ]
 
+    static var supportedIngredients: Set<String> { Set(per100Grams.keys) }
+
     static func estimate(ingredientWeights: [String: Double]) -> Macronutrients {
         ingredientWeights.reduce(into: Macronutrients()) { total, item in
             guard item.value > 0, let nutrients = per100Grams[item.key] else { return }

@@ -78,6 +78,9 @@ struct SettingsView: View {
                 NavigationLink { ReminderSettingsView() } label: {
                     Label("晚餐提醒", systemImage: "bell")
                 }
+                NavigationLink { ProPreviewView() } label: {
+                    Label("Pro 与付费资源", systemImage: "sparkles")
+                }
             }
             Section {
                 Text("数据默认仅保存在这台设备上。开启云同步前不会上传。")

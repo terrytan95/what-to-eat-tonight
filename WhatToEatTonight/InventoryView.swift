@@ -158,7 +158,11 @@ private struct AddInventoryView: View {
             Form {
                 TextField("食材名称", text: $name)
                 if let barcode { LabeledContent("条码", value: barcode) }
-                HStack { TextField("数量", value: $quantity, format: .number).keyboardType(.decimalPad); TextField("单位", text: $unit).frame(width: 80) }
+                HStack {
+                    TextField("数量", value: $quantity, format: .number).keyboardType(.decimalPad)
+                    Picker("单位", selection: $unit) { ForEach(["克", "个", "份", "毫升"], id: \.self) { Text($0) } }
+                        .labelsHidden()
+                }
                 Picker("存放位置", selection: $storage) { ForEach(["冷藏", "冷冻", "常温"], id: \.self) { Text($0) } }
                 Toggle("设置过期日期", isOn: $hasExpiry)
                 if hasExpiry { DatePicker("过期日期", selection: $expiresAt, displayedComponents: .date) }

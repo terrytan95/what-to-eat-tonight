@@ -5,6 +5,7 @@ import SwiftData
 struct WhatToEatTonightApp: App {
     private let persistence: PersistenceController
     @State private var appState: AppState
+    @State private var entitlementStore = EntitlementStore()
 
     init() {
         let persistence = PersistenceController()
@@ -17,7 +18,10 @@ struct WhatToEatTonightApp: App {
         WindowGroup {
             RootView()
                 .environment(appState)
+                .environment(entitlementStore)
                 .modelContainer(persistence.container)
+                .task { await entitlementStore.prepare() }
+                .task { await entitlementStore.observeTransactions() }
         }
     }
 }

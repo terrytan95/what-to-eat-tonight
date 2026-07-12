@@ -32,4 +32,9 @@ xcodebuild -project WhatToEatTonight.xcodeproj \
 
 ## 未来付费边界
 
-首版不提前接入 StoreKit。等免费核心体验与付费权益确定后，优先使用一个自动续订订阅或一个终身解锁，不同时创建多套商品。适合付费的候选权益是大型菜谱库、个性化周计划和跨网络多人房间；食材推荐、基础快速决定和本地近距离房间应保持免费。购买状态应由 StoreKit 2 验证并允许恢复购买，不自行保存“已付费”布尔值。
+StoreKit 2 的加载、购买、交易验证和恢复购买流程已经接好，但在 App Store Connect 创建商品前不会展示价格。预留商品 ID：
+
+- `com.terrytan.WhatToEatTonight.pro.monthly`
+- `com.terrytan.WhatToEatTonight.lifetime`
+
+适合付费的候选权益是扩展菜谱包、跨设备家庭菜单和跨网络多人房间；食材推荐、营养估算、基础快速决定和本地近距离房间保持免费。购买状态只以 StoreKit 验证交易为准，不自行保存“已付费”布尔值。
