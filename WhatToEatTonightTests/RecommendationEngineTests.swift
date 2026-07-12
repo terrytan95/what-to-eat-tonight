@@ -59,4 +59,12 @@ struct RecommendationEngineTests {
         let result = RecommendationEngine.recommendations(ingredients: ["番茄"], maximumMinutes: 20, diets: []).first { $0.recipe.id == "tomato-eggs" }
         #expect(result?.substitutions == ["鸡蛋可换嫩豆腐"])
     }
+
+    @Test func duelEliminatesOnlyTheLosingChoice() {
+        var duel = RecipeDuel(contenderIDs: ["a", "b", "c"])
+        duel.choose("b")
+        #expect(duel.contenderIDs == ["b", "c"])
+        duel.choose("c")
+        #expect(duel.winnerID == "c")
+    }
 }

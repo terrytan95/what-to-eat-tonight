@@ -110,6 +110,18 @@ struct DinnerChoice {
     let reason: String
 }
 
+struct RecipeDuel {
+    private(set) var contenderIDs: [String]
+    var pair: [String] { Array(contenderIDs.prefix(2)) }
+    var winnerID: String? { contenderIDs.count == 1 ? contenderIDs[0] : nil }
+
+    mutating func choose(_ winnerID: String) {
+        guard pair.contains(winnerID), pair.count == 2 else { return }
+        let loserID = pair.first { $0 != winnerID }
+        contenderIDs.removeAll { $0 == loserID }
+    }
+}
+
 enum RecipeCatalog {
     static let ingredients = ["鸡蛋", "番茄", "米饭", "面条", "鸡肉", "牛肉", "豆腐", "土豆", "洋葱", "青菜", "蘑菇", "虾", "奶酪", "面包"]
 

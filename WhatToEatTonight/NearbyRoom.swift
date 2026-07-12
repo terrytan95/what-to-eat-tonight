@@ -5,6 +5,9 @@ import UIKit
 struct RoomVote: Codable {
     let participant: String
     var likedRecipeIDs: Set<String>
+    var vetoedRecipeIDs: Set<String>? = nil
+    var isSubmitted: Bool? = nil
+    var role: String? = nil
 }
 
 @MainActor
@@ -22,15 +25,20 @@ final class NearbyRoom: NSObject {
     var votes: [String: RoomVote] = [:]
 
     var localParticipant: String { peerID.displayName }
+    var allSubmitted: Bool { votes.count > 1 && votes.values.allSatisfy { $0.isSubmitted != false } }
     var matches: [Recipe] {
-        guard !votes.isEmpty else { return [] }
-        return RecipeCatalog.recipes.filter { recipe in votes.values.allSatisfy { $0.likedRecipeIDs.contains(recipe.id) } }
+        guard allSubmitted else { return [] }
+        let vetoes = Set(votes.values.flatMap { $0.vetoedRecipeIDs ?? [] })
+        return RecipeCatalog.recipes.filter { recipe in !vetoes.contains(recipe.id) && votes.values.allSatisfy { $0.likedRecipeIDs.contains(recipe.id) } }
     }
 
     var bestFallback: Recipe? {
-        guard matches.isEmpty, votes.count > 1 else { return nil }
-        return RecipeCatalog.recipes.max { lhs, rhs in
-            votes.values.count { $0.likedRecipeIDs.contains(lhs.id) } < votes.values.count { $0.likedRecipeIDs.contains(rhs.id) }
+        guard allSubmitted, matches.isEmpty else { return nil }
+        let vetoes = Set(votes.values.flatMap { $0.vetoedRecipeIDs ?? [] })
+        return RecipeCatalog.recipes.filter { !vetoes.contains($0.id) }.max { lhs, rhs in
+            let left = vetoes.contains(lhs.id) ? -1 : votes.values.count { $0.likedRecipeIDs.contains(lhs.id) }
+            let right = vetoes.contains(rhs.id) ? -1 : votes.values.count { $0.likedRecipeIDs.contains(rhs.id) }
+            return left < right
         }
     }
 
@@ -68,6 +76,33 @@ final class NearbyRoom: NSObject {
         ensureLocalVote()
         var vote = votes[peerID.displayName]!
         vote.likedRecipeIDs.formSymmetricDifference([recipeID])
+        vote.isSubmitted = false
+        votes[peerID.displayName] = vote
+        send(vote)
+    }
+
+    func toggleVeto(_ recipeID: String) {
+        ensureLocalVote()
+        var vote = votes[peerID.displayName]!
+        if vote.vetoedRecipeIDs?.contains(recipeID) == true { vote.vetoedRecipeIDs = [] }
+        else { vote.vetoedRecipeIDs = [recipeID] }
+        vote.isSubmitted = false
+        votes[peerID.displayName] = vote
+        send(vote)
+    }
+
+    func submitVote() {
+        ensureLocalVote()
+        var vote = votes[peerID.displayName]!
+        vote.isSubmitted = true
+        votes[peerID.displayName] = vote
+        send(vote)
+    }
+
+    func setRole(_ role: String) {
+        ensureLocalVote()
+        var vote = votes[peerID.displayName]!
+        vote.role = role
         votes[peerID.displayName] = vote
         send(vote)
     }
@@ -91,7 +126,7 @@ final class NearbyRoom: NSObject {
     }
 
     private func ensureLocalVote() {
-        votes[peerID.displayName, default: RoomVote(participant: peerID.displayName, likedRecipeIDs: [])] = votes[peerID.displayName] ?? RoomVote(participant: peerID.displayName, likedRecipeIDs: [])
+        votes[peerID.displayName, default: RoomVote(participant: peerID.displayName, likedRecipeIDs: [], vetoedRecipeIDs: [], isSubmitted: false)] = votes[peerID.displayName] ?? RoomVote(participant: peerID.displayName, likedRecipeIDs: [], vetoedRecipeIDs: [], isSubmitted: false)
     }
 
     private func send(_ vote: RoomVote) {

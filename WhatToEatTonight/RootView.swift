@@ -401,9 +401,11 @@ struct DecideView: View {
 }
 
 struct TogetherView: View {
+    @Environment(AppState.self) private var state
     @State private var room = NearbyRoom()
     @State private var enteredCode = ""
     @State private var showVoting = false
+    @State private var showDuel = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -413,6 +415,8 @@ struct TogetherView: View {
             }.padding(.vertical, 22)
             Button { room.create(); showVoting = true } label: { Label("创建房间", systemImage: "plus.circle.fill").frame(maxWidth: .infinity).frame(minHeight: 50) }
                 .appPrimaryButtonStyle().tint(AppTheme.orange)
+            Button("快速二选一", systemImage: "rectangle.2.swap") { showDuel = true }
+                .frame(maxWidth: .infinity).frame(minHeight: 46).appSecondaryButtonStyle()
             HStack {
                 Rectangle().fill(.primary.opacity(0.15)).frame(height: 0.5)
                 Text("或加入已有房间").font(.caption).foregroundStyle(.secondary).fixedSize()
@@ -427,11 +431,48 @@ struct TogetherView: View {
         }
         .padding(18).background(AppTheme.background).toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showVoting) { VotingRoomView(room: room) }
+        .navigationDestination(isPresented: $showDuel) {
+            RecipeDuelView(recipeIDs: RecipeCatalog.recipes.map(\.id).sorted {
+                (state.recentChoices.firstIndex(of: $0) ?? .max) > (state.recentChoices.firstIndex(of: $1) ?? .max)
+            })
+        }
         .onChange(of: showVoting) { oldValue, newValue in if oldValue, !newValue { room.stop() } }
         .onDisappear { if !showVoting { room.stop() } }
     }
 
     private func avatar(_ symbol: String, color: Color) -> some View { Image(systemName: symbol).font(.system(size: 68)).foregroundStyle(color).accessibilityHidden(true) }
+}
+
+struct RecipeDuelView: View {
+    @State private var duel: RecipeDuel
+
+    init(recipeIDs: [String]) { _duel = State(initialValue: RecipeDuel(contenderIDs: recipeIDs)) }
+
+    var body: some View {
+        VStack(spacing: 24) {
+            if let winnerID = duel.winnerID, let winner = recipe(winnerID) {
+                Text("今晚就吃").font(.title2.bold())
+                FoodIcon(emoji: winner.emoji, size: 180)
+                Text(winner.name).font(.largeTitle.bold())
+                NavigationLink("查看菜谱", value: winner).appPrimaryButtonStyle().tint(AppTheme.orange)
+            } else {
+                Text("选一个更想吃的").font(.title.bold())
+                ForEach(duel.pair, id: \.self) { id in
+                    if let recipe = recipe(id) {
+                        Button { duel.choose(id) } label: {
+                            HStack { FoodIcon(emoji: recipe.emoji, size: 70); Text(recipe.name).font(.title2.bold()); Spacer() }.appCard()
+                        }.buttonStyle(.plain)
+                    }
+                }
+                Text("还剩 \(duel.contenderIDs.count) 道").font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(18).background(AppTheme.background).navigationTitle("菜品对战").navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(for: Recipe.self) { RecipeDetailView(recipe: $0) }
+    }
+
+    private func recipe(_ id: String) -> Recipe? { RecipeCatalog.recipes.first { $0.id == id } }
 }
 
 struct VotingRoomView: View {
@@ -442,6 +483,7 @@ struct VotingRoomView: View {
             VStack(spacing: 14) {
                 HStack {
                     Label(room.status, systemImage: "circle.fill").font(.caption).foregroundStyle(AppTheme.green)
+                    Text("\(room.votes.count) 人").font(.caption).foregroundStyle(.secondary)
                     Spacer(); QRCodeView(value: room.code).frame(width: 74, height: 74)
                 }.appCard(padding: 12)
 
@@ -453,26 +495,42 @@ struct VotingRoomView: View {
                         .appCard(padding: 14).buttonStyle(.plain)
                 }
 
+                if room.votes[room.localParticipant]?.isSubmitted != true {
+                    Button("匿名提交选择", systemImage: "checkmark.seal.fill") { room.submitVote() }
+                        .frame(maxWidth: .infinity).frame(minHeight: 46).appPrimaryButtonStyle().tint(AppTheme.orange)
+                } else if !room.allSubmitted {
+                    Label("已提交，等待其他人", systemImage: "hourglass").foregroundStyle(.secondary).appCard(padding: 14)
+                }
+
+                Menu("我的分工", systemImage: "person.badge.clock") {
+                    ForEach(["买菜", "备菜", "做饭", "洗碗"], id: \.self) { role in Button(role) { room.setRole(role) } }
+                }
+
                 VStack(spacing: 0) {
                     HStack {
-                        Spacer(); Text("我").frame(width: 34); Text("对方").frame(width: 34)
+                        Spacer(); Text("我").frame(width: 34); Text("他人").frame(width: 34); Text("否决").frame(width: 34)
                     }.font(.caption2).foregroundStyle(.secondary).padding(.bottom, 4)
                     ForEach(RecipeCatalog.recipes) { recipe in
                         let liked = room.votes[room.localParticipant]?.likedRecipeIDs.contains(recipe.id) == true
-                        let remoteLiked = room.votes.values.filter { $0.participant != room.localParticipant }.contains { $0.likedRecipeIDs.contains(recipe.id) }
+                        let remoteLikes = room.votes.values.filter { $0.participant != room.localParticipant && $0.likedRecipeIDs.contains(recipe.id) }.count
+                        let vetoed = room.votes[room.localParticipant]?.vetoedRecipeIDs?.contains(recipe.id) == true
                         Button { room.toggleLike(recipe.id) } label: {
                             HStack(spacing: 12) {
                                 FoodIcon(emoji: recipe.emoji, size: 44)
                                 VStack(alignment: .leading) { Text(recipe.name).font(.headline); Text("\(recipe.minutes) 分钟 · 简单").font(.caption).foregroundStyle(.secondary) }
                                 Spacer()
                                 Image(systemName: liked ? "heart.fill" : "heart").font(.title3).foregroundStyle(liked ? AppTheme.pink : .secondary).frame(width: 34)
-                                Image(systemName: remoteLiked ? "heart.fill" : "heart").font(.title3).foregroundStyle(remoteLiked ? AppTheme.pink : .secondary).frame(width: 34).allowsHitTesting(false)
+                                Text(room.allSubmitted ? "\(remoteLikes)" : "—").frame(width: 34).foregroundStyle(.secondary)
+                                Image(systemName: vetoed ? "hand.raised.fill" : "hand.raised").frame(width: 34).foregroundStyle(vetoed ? AppTheme.orange : .secondary)
                             }.padding(.vertical, 11)
-                        }.buttonStyle(.plain).accessibilityValue("我\(liked ? "已喜欢" : "未选择")，对方\(remoteLiked ? "已喜欢" : "未选择")")
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityValue("我\(liked ? "已喜欢" : "未选择")，\(vetoed ? "已否决" : "未否决")")
+                        .contextMenu { Button(vetoed ? "取消否决" : "否决这道菜", systemImage: "hand.raised") { room.toggleVeto(recipe.id) } }
                         if recipe.id != RecipeCatalog.recipes.last?.id { Divider() }
                     }
                 }.appCard(padding: 12)
-                Text("双方各点“♡”，找到共同喜欢的菜吧！").font(.footnote).foregroundStyle(.secondary)
+                Text("选择喜欢的菜后匿名提交；长按一道菜可使用一次否决。").font(.footnote).foregroundStyle(.secondary)
             }.padding(18)
         }
         .background(AppTheme.background).navigationTitle("房间：\(room.code)").navigationBarTitleDisplayMode(.inline)
