@@ -28,8 +28,59 @@ struct RootView: View {
             Tab("食材", systemImage: "carrot.fill") { NavigationStack { PantryView() } }
             Tab("决定", systemImage: "bolt.fill") { NavigationStack { DecideView() } }
             Tab("一起选", systemImage: "person.2.fill") { NavigationStack { TogetherView() } }
+            Tab("设置", systemImage: "gearshape.fill") { NavigationStack { SettingsView() } }
         }
         .tint(AppTheme.orange)
+    }
+}
+
+struct SettingsView: View {
+    @Environment(AppState.self) private var state
+    @State private var importText = ""
+    @State private var showImporter = false
+    @State private var showDeleteConfirmation = false
+    @State private var message: String?
+
+    var body: some View {
+        List {
+            Section("数据") {
+                if let export = try? state.exportData() {
+                    ShareLink(item: export) { Label("导出数据", systemImage: "square.and.arrow.up") }
+                }
+                Button { showImporter = true } label: { Label("导入数据", systemImage: "square.and.arrow.down") }
+                Button("删除全部数据", systemImage: "trash", role: .destructive) { showDeleteConfirmation = true }
+            }
+            Section {
+                Text("数据默认仅保存在这台设备上。开启云同步前不会上传。")
+            }.font(.footnote).foregroundStyle(.secondary)
+        }
+        .navigationTitle("设置")
+        .sheet(isPresented: $showImporter) {
+            NavigationStack {
+                TextEditor(text: $importText).font(.body.monospaced()).padding()
+                    .navigationTitle("粘贴导出数据")
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) { Button("取消") { showImporter = false } }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("导入") {
+                                do {
+                                    try state.importData(importText)
+                                    message = "导入完成"
+                                    showImporter = false
+                                } catch {
+                                    message = "无法导入：数据格式不正确"
+                                }
+                            }.disabled(importText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                    }
+            }
+        }
+        .confirmationDialog("确定删除所有本地数据？", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+            Button("删除全部数据", role: .destructive) { state.deleteAllData(); message = "本地数据已删除" }
+        }
+        .alert("WhatToEatTonight", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+            Button("好") { message = nil }
+        } message: { Text(message ?? "") }
     }
 }
 

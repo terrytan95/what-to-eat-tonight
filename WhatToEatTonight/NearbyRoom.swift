@@ -12,7 +12,7 @@ struct RoomVote: Codable {
 final class NearbyRoom: NSObject {
     private static let serviceType = "wteat-room"
     private let peerID = MCPeerID(displayName: String(UIDevice.current.name.prefix(40)))
-    nonisolated(unsafe) private var session: MCSession?
+    @ObservationIgnored nonisolated(unsafe) private var session: MCSession?
     private var advertiser: MCNearbyServiceAdvertiser?
     private var browser: MCNearbyServiceBrowser?
     private var expiryTask: Task<Void, Never>?
