@@ -28,6 +28,7 @@ struct RootView: View {
             Tab("食材", systemImage: "carrot.fill") { NavigationStack { PantryView() } }
             Tab("决定", systemImage: "bolt.fill") { NavigationStack { DecideView() } }
             Tab("一起选", systemImage: "person.2.fill") { NavigationStack { TogetherView() } }
+            Tab("清单", systemImage: "cart.fill") { NavigationStack { ShoppingListView() } }
             Tab("设置", systemImage: "gearshape.fill") { NavigationStack { SettingsView() } }
         }
         .tint(AppTheme.orange)
@@ -277,6 +278,7 @@ struct RecipeDetailView: View {
     @State private var showRating = false
     @State private var privateEntry = false
     @State private var showConsume = false
+    @State private var shoppingAdded = false
 
     var body: some View {
         ScrollView {
@@ -294,6 +296,12 @@ struct RecipeDetailView: View {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 12) {
                     ForEach(recipe.ingredients, id: \.self) { Text("\($0.ingredientEmoji)  \($0)") }
                 }
+                Button {
+                    state.addRecipeToShoppingList(recipe)
+                    shoppingAdded = true
+                } label: {
+                    Label(shoppingAdded ? "已加入购物清单" : "把缺少食材加入购物清单", systemImage: shoppingAdded ? "checkmark" : "cart.badge.plus")
+                }.disabled(shoppingAdded)
                 Divider()
                 Text("步骤").font(.headline)
                 ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, step in

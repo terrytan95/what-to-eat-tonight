@@ -34,5 +34,10 @@ struct PersistenceTests {
         state.addInventory(text: "鸡蛋、番茄\n鸡蛋")
         #expect(state.inventory.count == 2)
         #expect(state.inventory.first { $0.name == "鸡蛋" }?.quantity == 2)
+
+        state.addRecipeToShoppingList(RecipeCatalog.recipes.first { $0.id == "cheese-toast" }!)
+        #expect(state.shoppingList.map(\.name) == ["面包", "奶酪"])
+        state.addShoppingItem(name: "面包")
+        #expect(state.shoppingList.first { $0.name == "面包" }?.quantity == 2)
     }
 }

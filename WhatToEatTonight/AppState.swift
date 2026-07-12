@@ -24,6 +24,15 @@ final class AppState {
             let isStaple: Bool
             let barcode: String?
         }
+        struct Shopping: Codable {
+            let id: UUID
+            let name: String
+            let quantity: Double
+            let unit: String
+            let category: String
+            let isChecked: Bool
+            let createdAt: Date
+        }
 
         let version: Int
         let favorites: [String]
@@ -31,6 +40,7 @@ final class AppState {
         let recentChoices: [String]
         let meals: [Meal]?
         let inventory: [Inventory]?
+        let shopping: [Shopping]?
     }
 
     var selectedIngredients: Set<String> = []
@@ -41,6 +51,7 @@ final class AppState {
     var recentChoices: [String] = []
     var mealHistory: [MealRecord] = []
     var inventory: [InventoryItem] = []
+    var shoppingList: [ShoppingItem] = []
     var recommendationFilters = RecommendationFilters()
     var servings = 2
 
@@ -82,6 +93,7 @@ final class AppState {
         let meals = FetchDescriptor<MealRecord>(sortBy: [SortDescriptor(\.cookedAt, order: .reverse)])
         mealHistory = (try? context.fetch(meals)) ?? []
         inventory = (try? context.fetch(FetchDescriptor<InventoryItem>(sortBy: [SortDescriptor(\.name)]))) ?? []
+        shoppingList = (try? context.fetch(FetchDescriptor<ShoppingItem>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
     }
 
     func toggleFavorite(_ id: String) {
@@ -181,10 +193,43 @@ final class AppState {
         persist()
     }
 
+    func addShoppingItem(name: String, quantity: Double = 1, unit: String = "份") {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, quantity > 0 else { return }
+        if let existing = shoppingList.first(where: { $0.name == name && $0.unit == unit && !$0.isChecked }) {
+            existing.quantity += quantity
+        } else {
+            let item = ShoppingItem(name: name, quantity: quantity, unit: unit, category: Self.shoppingCategory(for: name))
+            context.insert(item)
+            shoppingList.append(item)
+        }
+        persist()
+    }
+
+    func addRecipeToShoppingList(_ recipe: Recipe) {
+        let stocked = Set(inventory.filter { $0.quantity > 0 }.map(\.name))
+        recipe.ingredients.filter { !stocked.contains($0) }.forEach { addShoppingItem(name: $0) }
+    }
+
+    func toggleShoppingItem(_ item: ShoppingItem) { item.isChecked.toggle(); persist() }
+    func deleteShoppingItem(_ item: ShoppingItem) { shoppingList.removeAll { $0.id == item.id }; context.delete(item); persist() }
+
+    var shoppingListText: String {
+        shoppingList.filter { !$0.isChecked }.map { "□ \($0.name) \($0.quantity.formatted()) \($0.unit)" }.joined(separator: "\n")
+    }
+
+    private static func shoppingCategory(for name: String) -> String {
+        if ["鸡肉", "牛肉", "虾", "鸡蛋"].contains(name) { return "肉蛋水产" }
+        if ["米饭", "面条", "面包"].contains(name) { return "主食" }
+        if ["奶酪"].contains(name) { return "乳制品" }
+        return "蔬菜及其他"
+    }
+
     func exportData() throws -> String {
         let meals = mealHistory.map { Archive.Meal(id: $0.id, recipeID: $0.recipeID, cookedAt: $0.cookedAt, rating: $0.rating, note: $0.note) }
         let inventory = inventory.map { Archive.Inventory(id: $0.id, name: $0.name, quantity: $0.quantity, unit: $0.unit, storage: $0.storage, purchasedAt: $0.purchasedAt, expiresAt: $0.expiresAt, isStaple: $0.isStaple, barcode: $0.barcode) }
-        let archive = Archive(version: 1, favorites: favorites.sorted(), disliked: disliked.sorted(), recentChoices: recentChoices, meals: meals, inventory: inventory)
+        let shopping = shoppingList.map { Archive.Shopping(id: $0.id, name: $0.name, quantity: $0.quantity, unit: $0.unit, category: $0.category, isChecked: $0.isChecked, createdAt: $0.createdAt) }
+        let archive = Archive(version: 1, favorites: favorites.sorted(), disliked: disliked.sorted(), recentChoices: recentChoices, meals: meals, inventory: inventory, shopping: shopping)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         return String(decoding: try encoder.encode(archive), as: UTF8.self)
@@ -217,6 +262,12 @@ final class AppState {
             context.insert(item)
             return item
         }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        try context.delete(model: ShoppingItem.self)
+        shoppingList = (archive.shopping ?? []).filter { !$0.name.isEmpty && $0.quantity >= 0 }.map {
+            let item = ShoppingItem(id: $0.id, name: $0.name, quantity: $0.quantity, unit: $0.unit, category: $0.category, isChecked: $0.isChecked, createdAt: $0.createdAt)
+            context.insert(item)
+            return item
+        }
         try context.save()
     }
 
@@ -230,8 +281,10 @@ final class AppState {
         do {
             try context.delete(model: MealRecord.self)
             try context.delete(model: InventoryItem.self)
+            try context.delete(model: ShoppingItem.self)
             mealHistory = []
             inventory = []
+            shoppingList = []
         } catch {
             assertionFailure("Unable to delete meal history: \(error.localizedDescription)")
         }
