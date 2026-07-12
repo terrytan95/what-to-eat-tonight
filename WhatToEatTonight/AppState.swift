@@ -22,6 +22,7 @@ final class AppState {
             let purchasedAt: Date
             let expiresAt: Date?
             let isStaple: Bool
+            let barcode: String?
         }
 
         let version: Int
@@ -123,7 +124,7 @@ final class AppState {
         return Set(inventory.filter { $0.quantity > 0 && $0.expiresAt.map { $0 <= deadline } == true }.map(\.name))
     }
 
-    func addInventory(name: String, quantity: Double, unit: String, storage: String, expiresAt: Date?, isStaple: Bool) {
+    func addInventory(name: String, quantity: Double, unit: String, storage: String, expiresAt: Date?, isStaple: Bool, barcode: String? = nil) {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, quantity > 0 else { return }
         if expiresAt == nil, let existing = inventory.first(where: { $0.name == name && $0.unit == unit && $0.storage == storage && $0.expiresAt == nil }) {
@@ -133,12 +134,20 @@ final class AppState {
             persist()
             return
         }
-        let item = InventoryItem(name: name, quantity: quantity, unit: unit, storage: storage, expiresAt: expiresAt, isStaple: isStaple)
+        let item = InventoryItem(name: name, quantity: quantity, unit: unit, storage: storage, expiresAt: expiresAt, isStaple: isStaple, barcode: barcode)
         context.insert(item)
         inventory.append(item)
         inventory.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         selectedIngredients.insert(name)
         persist()
+    }
+
+    func addKnownBarcode(_ barcode: String) -> Bool {
+        guard let item = inventory.first(where: { $0.barcode == barcode }) else { return false }
+        item.quantity += 1
+        selectedIngredients.insert(item.name)
+        persist()
+        return true
     }
 
     func addInventory(text: String, storage: String = "冷藏") {
@@ -163,7 +172,7 @@ final class AppState {
 
     func exportData() throws -> String {
         let meals = mealHistory.map { Archive.Meal(id: $0.id, recipeID: $0.recipeID, cookedAt: $0.cookedAt, rating: $0.rating, note: $0.note) }
-        let inventory = inventory.map { Archive.Inventory(id: $0.id, name: $0.name, quantity: $0.quantity, unit: $0.unit, storage: $0.storage, purchasedAt: $0.purchasedAt, expiresAt: $0.expiresAt, isStaple: $0.isStaple) }
+        let inventory = inventory.map { Archive.Inventory(id: $0.id, name: $0.name, quantity: $0.quantity, unit: $0.unit, storage: $0.storage, purchasedAt: $0.purchasedAt, expiresAt: $0.expiresAt, isStaple: $0.isStaple, barcode: $0.barcode) }
         let archive = Archive(version: 1, favorites: favorites.sorted(), disliked: disliked.sorted(), recentChoices: recentChoices, meals: meals, inventory: inventory)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -193,7 +202,7 @@ final class AppState {
         }.sorted { $0.cookedAt > $1.cookedAt }
         try context.delete(model: InventoryItem.self)
         inventory = (archive.inventory ?? []).map {
-            let item = InventoryItem(id: $0.id, name: $0.name, quantity: $0.quantity, unit: $0.unit, storage: $0.storage, purchasedAt: $0.purchasedAt, expiresAt: $0.expiresAt, isStaple: $0.isStaple)
+            let item = InventoryItem(id: $0.id, name: $0.name, quantity: $0.quantity, unit: $0.unit, storage: $0.storage, purchasedAt: $0.purchasedAt, expiresAt: $0.expiresAt, isStaple: $0.isStaple, barcode: $0.barcode)
             context.insert(item)
             return item
         }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }

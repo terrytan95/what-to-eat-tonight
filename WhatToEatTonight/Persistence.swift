@@ -48,8 +48,9 @@ final class InventoryItem {
     var purchasedAt: Date
     var expiresAt: Date?
     var isStaple: Bool
+    var barcode: String?
 
-    init(id: UUID = UUID(), name: String, quantity: Double = 1, unit: String = "份", storage: String = "冷藏", purchasedAt: Date = .now, expiresAt: Date? = nil, isStaple: Bool = false) {
+    init(id: UUID = UUID(), name: String, quantity: Double = 1, unit: String = "份", storage: String = "冷藏", purchasedAt: Date = .now, expiresAt: Date? = nil, isStaple: Bool = false, barcode: String? = nil) {
         self.id = id
         self.name = name
         self.quantity = quantity
@@ -58,6 +59,7 @@ final class InventoryItem {
         self.purchasedAt = purchasedAt
         self.expiresAt = expiresAt
         self.isStaple = isStaple
+        self.barcode = barcode
     }
 }
 

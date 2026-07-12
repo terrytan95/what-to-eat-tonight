@@ -13,6 +13,7 @@
 	<key>LSApplicationCategoryType</key><string>public.app-category.food-and-drink</string>
 	<key>NSBonjourServices</key><array><string>_wteat-room._tcp.</string></array>
 	<key>NSLocalNetworkUsageDescription</key><string>用于发现附近的共同选餐房间。</string>
+	<key>NSCameraUsageDescription</key><string>用于扫描食材包装文字和商品条码，识别结果会先由你确认。</string>
 	<key>UILaunchScreen</key><dict/>
 </dict>
 </plist>
