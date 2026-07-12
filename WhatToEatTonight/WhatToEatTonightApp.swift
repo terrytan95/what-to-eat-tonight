@@ -8,7 +8,6 @@ struct WhatToEatTonightApp: App {
         WindowGroup {
             RootView()
                 .environment(appState)
-                .tint(.orange)
         }
     }
 }

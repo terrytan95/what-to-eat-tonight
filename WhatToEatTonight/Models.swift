@@ -1,6 +1,4 @@
-import Foundation
-
-struct Recipe: Identifiable, Hashable, Codable {
+struct Recipe: Identifiable, Hashable {
     let id: String
     let name: String
     let emoji: String
@@ -14,7 +12,7 @@ struct Recipe: Identifiable, Hashable, Codable {
     }
 }
 
-enum Diet: String, CaseIterable, Codable, Identifiable {
+enum Diet: String, CaseIterable, Identifiable {
     case vegetarian = "素食"
     case dairyFree = "无乳制品"
     case glutenFree = "无麸质"
@@ -22,7 +20,7 @@ enum Diet: String, CaseIterable, Codable, Identifiable {
     var id: Self { self }
 }
 
-struct Recommendation: Identifiable, Hashable {
+struct Recommendation: Identifiable {
     let recipe: Recipe
     let available: [String]
     let missing: [String]
@@ -36,7 +34,7 @@ enum DinnerMode: String, CaseIterable, Identifiable {
     var id: Self { self }
 }
 
-struct DinnerChoice: Identifiable, Hashable {
+struct DinnerChoice {
     let id: String
     let name: String
     let emoji: String
@@ -67,14 +65,13 @@ enum DinnerDecider {
     ]
 
     static func choices(mode: DinnerMode, maximumMinutes: Int, diets: Set<Diet>, excluding: Set<String>) -> [DinnerChoice] {
-        let choices = switch mode {
+        switch mode {
         case .cook:
-            RecipeCatalog.recipes
+            return RecipeCatalog.recipes
                 .filter { $0.isEligible(maximumMinutes: maximumMinutes, diets: diets, excluding: excluding) }
                 .map { DinnerChoice(id: $0.id, name: $0.name, emoji: $0.emoji, reason: "约 \($0.minutes) 分钟就能上桌") }
         case .eatOut:
-            diningCategories
+            return diningCategories.filter { !excluding.contains($0.id) }
         }
-        return mode == .cook ? choices : choices.filter { !excluding.contains($0.id) }
     }
 }

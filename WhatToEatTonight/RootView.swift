@@ -422,15 +422,15 @@ private struct DemoScreenView: View {
 
     @ViewBuilder private var togetherScreen: some View {
         switch screen {
-        case .voting: VotingRoomView(room: room).task { seedRoom(match: false) }
+        case .voting: VotingRoomView(room: room).task { seedRoom() }
         case .match: MatchResultView(recipe: RecipeCatalog.recipes[0])
         default: TogetherView()
         }
     }
 
-    private func seedRoom(match: Bool) {
+    private func seedRoom() {
         room.code = "123456"; room.status = "2 人在线"
-        room.votes = [room.localParticipant: .init(participant: room.localParticipant, likedRecipeIDs: ["tomato-eggs"]), "对方": .init(participant: "对方", likedRecipeIDs: match ? ["tomato-eggs"] : [])]
+        room.votes = [room.localParticipant: .init(participant: room.localParticipant, likedRecipeIDs: ["tomato-eggs"]), "对方": .init(participant: "对方", likedRecipeIDs: [])]
     }
 }
 #endif

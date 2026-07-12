@@ -2,7 +2,7 @@
 import Observation
 import UIKit
 
-struct RoomVote: Codable, Hashable {
+struct RoomVote: Codable {
     let participant: String
     var likedRecipeIDs: Set<String>
 }
@@ -22,8 +22,6 @@ final class NearbyRoom: NSObject {
     var votes: [String: RoomVote] = [:]
 
     var localParticipant: String { peerID.displayName }
-    var participantCount: Int { max(1, Set(votes.keys).count) }
-
     var matches: [Recipe] {
         guard !votes.isEmpty else { return [] }
         return RecipeCatalog.recipes.filter { recipe in votes.values.allSatisfy { $0.likedRecipeIDs.contains(recipe.id) } }
