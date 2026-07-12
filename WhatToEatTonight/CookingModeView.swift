@@ -17,6 +17,7 @@ struct CookingModeView: View {
                     VStack(spacing: 24) {
                         Text("第 \(session.currentStep + 1) / \(recipe.steps.count) 步").font(.headline).foregroundStyle(AppTheme.orange)
                         Text(recipe.steps[session.currentStep]).font(.system(.title, design: .rounded, weight: .semibold)).multilineTextAlignment(.center).frame(maxWidth: .infinity, minHeight: 220).appCard()
+                        NutritionSummaryView(nutrients: NutritionEstimator.estimate(recipe: recipe, servings: state.servings), title: "本次 \(state.servings) 人份营养估算")
 
                         HStack {
                             Button("上一步", systemImage: "chevron.left") { state.moveCookingStep(session, to: session.currentStep - 1, stepCount: recipe.steps.count) }

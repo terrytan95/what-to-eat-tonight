@@ -297,8 +297,12 @@ struct RecipeDetailView: View {
                 Divider()
                 Text("食材（\(state.servings) 人份）").font(.headline)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 12) {
-                    ForEach(recipe.ingredients, id: \.self) { Text("\($0.ingredientEmoji)  \($0)") }
+                    ForEach(recipe.ingredients, id: \.self) { ingredient in
+                        let grams = (recipe.ingredientGrams[ingredient] ?? 0) * Double(state.servings) / 2
+                        Text("\(ingredient.ingredientEmoji)  \(ingredient)  \(grams.formatted(.number.precision(.fractionLength(0))))g")
+                    }
                 }
+                NutritionSummaryView(nutrients: NutritionEstimator.estimate(recipe: recipe, servings: 1), title: "每人份营养估算")
                 Button {
                     state.addRecipeToShoppingList(recipe)
                     shoppingAdded = true

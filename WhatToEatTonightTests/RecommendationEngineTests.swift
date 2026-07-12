@@ -67,4 +67,13 @@ struct RecommendationEngineTests {
         duel.choose("c")
         #expect(duel.winnerID == "c")
     }
+
+    @Test func nutritionScalesFromIngredientWeightAndServings() {
+        let one = NutritionEstimator.estimate(recipe: RecipeCatalog.recipes[0], servings: 1)
+        let two = NutritionEstimator.estimate(recipe: RecipeCatalog.recipes[0], servings: 2)
+        #expect(one.protein > 0)
+        #expect(abs(two.protein - one.protein * 2) < 0.001)
+        #expect(abs(two.calories - one.calories * 2) < 0.001)
+        #expect(NutritionEstimator.matches(.lighter, recipe: RecipeCatalog.recipes[0]))
+    }
 }

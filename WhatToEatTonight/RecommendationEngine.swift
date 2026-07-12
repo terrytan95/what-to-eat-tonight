@@ -22,7 +22,7 @@ enum RecommendationEngine {
                     && filters.tool.map(attributes.tools.contains) != false
                     && filters.cuisine.map { attributes.cuisine == $0 } != false
                     && filters.occasion.map(attributes.occasions.contains) != false
-                    && filters.nutrition.map(attributes.nutrition.contains) != false
+                    && filters.nutrition.map { NutritionEstimator.matches($0, recipe: recipe) } != false
                     && filters.weather.map(attributes.weather.contains) != false
                     && filters.budgetPerPerson.map { attributes.estimatedCostPerPerson <= $0 } != false
             }
